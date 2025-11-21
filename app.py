@@ -206,7 +206,7 @@ if vista == "🔍 Revisar Existencias":
                 if existencia == 0 and corta_cad == 0:
                     # ROJO CLARO (Tono oscuro para Dark Mode)
                     colores = ['background-color: #390D10'] * len(row)
-                elif corta_cad > 0:
+                elif existencia == 0 and corta_cad > 0:
                     # AMARILLO CLARO (Tono oscuro para Dark Mode)
                     colores = ['background-color: #4B3718'] * len(row)
                 
