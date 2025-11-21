@@ -172,6 +172,18 @@ if vista == "🔍 Revisar Existencias":
 elif vista == "📝 Reportar Faltantes":
     st.header("📝 Generador de Reporte de Faltantes")
     
+    # --- BOTÓN DE REINICIO EN LA BARRA LATERAL ---
+    with st.sidebar:
+        st.divider()
+        st.markdown("### ⚙️ Acciones")
+        # Usamos type="primary" para que salga rojo/destacado
+        if st.button("🗑️ BORRAR TODO (Reiniciar)", type="primary", help="Borra todos los pedidos y el carrito actual"):
+            st.session_state.pedidos = []
+            st.session_state.carrito = []
+            st.session_state.cliente_box = None
+            st.rerun() # Recarga la página suavemente con los datos en cero
+    # ----------------------------------------------------
+    
     # Callbacks
     def agregar_producto():
         cliente = st.session_state.cliente_box
