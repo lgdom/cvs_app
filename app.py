@@ -101,9 +101,14 @@ with st.sidebar:
 if vista == "🔍 Revisar Existencias":
     st.header("🔍 Buscador de Existencias")
 
-    # --- INICIALIZAR ESTADO DE LA LISTA DE REVISIÓN ---
+    # --- ESTADOS INICIALES ---
     if 'lista_revision' not in st.session_state:
         st.session_state.lista_revision = []
+    
+    # TRUCO PARA LIMPIAR SELECCIÓN:
+    # Usaremos este contador para cambiar la 'key' de la tabla y forzar su reinicio
+    if 'reset_counter' not in st.session_state:
+        st.session_state.reset_counter = 0
 
     # 1. CARGA DE ARCHIVO (Persistente)
     if st.session_state.df_inventario_diario is None:
@@ -113,31 +118,26 @@ if vista == "🔍 Revisar Existencias":
         if uploaded_file:
             try:
                 with st.spinner("Procesando e indexando..."):
-                    # Leer archivo
                     if uploaded_file.name.endswith('.csv'):
                         try: df_inv = pd.read_csv(uploaded_file, header=1, encoding='latin-1')
                         except: uploaded_file.seek(0); df_inv = pd.read_csv(uploaded_file, header=1, encoding='utf-8')
                     else:
                         df_inv = pd.read_excel(uploaded_file, header=1)
 
-                    # Limpiar
                     df_tj = df_inv.iloc[:, [0, 1, 5, 6]].copy()
                     df_tj.columns = ['CODIGO', 'PRODUCTO_INV', 'CORTA_CAD', 'EXISTENCIA']
                     df_tj = df_tj.dropna(subset=['CODIGO'])
                     df_tj['CODIGO'] = df_tj['CODIGO'].astype(str).str.strip()
 
-                    # Cruzar
                     df_merged = pd.merge(df_tj, df_productos[['CODIGO', 'SUSTANCIA']], on='CODIGO', how='left')
                     df_merged['SUSTANCIA'] = df_merged['SUSTANCIA'].fillna('---')
                     
-                    # Índice
                     df_merged['INDICE_BUSQUEDA'] = (
                         df_merged['CODIGO'] + " " + 
                         df_merged['PRODUCTO_INV'] + " " + 
                         df_merged['SUSTANCIA']
                     ).str.upper()
 
-                    # Guardar en memoria
                     cols_finales = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
                     st.session_state.df_inventario_diario = df_merged[cols_finales]
                     st.rerun()
@@ -159,30 +159,32 @@ if vista == "🔍 Revisar Existencias":
         
         if busqueda:
             mask = df_memoria['INDICE_BUSQUEDA'].str.contains(busqueda, na=False)
-            # Mostramos resultados listos para seleccionar
             resultados = df_memoria[mask].drop(columns=['INDICE_BUSQUEDA'])
             st.success(f"Encontrados: {len(resultados)}")
             
-            # TABLA INTERACTIVA CON SELECCIÓN
-            # on_select="rerun" permite capturar qué filas seleccionaste
+            # TABLA CON KEY DINÁMICA (table_0, table_1...)
+            # Cada vez que aumentamos el contador, la tabla se "renueva" y pierde la selección.
+            dynamic_key = f"search_table_{st.session_state.reset_counter}"
+            
             event = st.dataframe(
                 resultados,
                 use_container_width=True,
                 hide_index=True,
                 on_select="rerun", 
-                selection_mode="multi-row"
+                selection_mode="multi-row",
+                key=dynamic_key # <--- LA CLAVE MÁGICA
             )
             
-            # BOTÓN PARA AGREGAR LO SELECCIONADO
             if len(event.selection.rows) > 0:
                 if st.button(f"⬇️ Agregar ({len(event.selection.rows)}) a mi Revisión"):
-                    # Obtener los datos de las filas seleccionadas
                     filas_seleccionadas = resultados.iloc[event.selection.rows]
-                    
-                    # Convertir a diccionario y agregar a la lista
                     nuevos_items = filas_seleccionadas.to_dict('records')
                     st.session_state.lista_revision.extend(nuevos_items)
-                    st.toast("✅ Agregado a la tabla inferior")
+                    
+                    # --- AQUÍ OCURRE EL RESET ---
+                    st.session_state.reset_counter += 1 # Cambiamos la ID de la tabla
+                    st.toast("✅ Agregado")
+                    st.rerun() # Recargamos para que aparezca la tabla "nueva" limpia
         else:
             st.info("Inventario cargado. Escribe arriba para filtrar.")
 
@@ -194,7 +196,7 @@ if vista == "🔍 Revisar Existencias":
         if st.session_state.lista_revision:
             df_rev = pd.DataFrame(st.session_state.lista_revision)
             
-            # Función para dar color (Rojo, Amarillo o Nada)
+            # TU LÓGICA DE COLORES PERSONALIZADA
             def estilo_existencias(row):
                 existencia = pd.to_numeric(row['EXISTENCIA'], errors='coerce') or 0
                 corta_cad = pd.to_numeric(row['CORTA_CAD'], errors='coerce') or 0
@@ -202,15 +204,14 @@ if vista == "🔍 Revisar Existencias":
                 colores = [''] * len(row)
                 
                 if existencia == 0 and corta_cad == 0:
-                    # ROJO CLARO si no hay nada
+                    # ROJO CLARO (Tono oscuro para Dark Mode)
                     colores = ['background-color: #390D10'] * len(row)
                 elif corta_cad > 0:
-                    # AMARILLO CLARO si hay corta caducidad (y existencia > 0)
+                    # AMARILLO CLARO (Tono oscuro para Dark Mode)
                     colores = ['background-color: #4B3718'] * len(row)
                 
                 return colores
 
-            # Aplicar estilos
             st.dataframe(
                 df_rev.style.apply(estilo_existencias, axis=1),
                 use_container_width=True,
