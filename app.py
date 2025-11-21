@@ -201,7 +201,7 @@ if vista == "🔍 Revisar Existencias":
                 
                 colores = [''] * len(row)
                 
-                if existencia, corta_cad == 0:
+                if existencia == 0 and corta_cad == 0:
                     # ROJO CLARO si no hay nada
                     colores = ['background-color: #390D10'] * len(row)
                 elif corta_cad > 0:
