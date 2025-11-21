@@ -100,9 +100,12 @@ with st.sidebar:
 # ==============================================================================
 if vista == "🔍 Revisar Existencias":
     st.header("🔍 Buscador de Existencias")
-    
-    # LÓGICA DE PERSISTENCIA:
-    # Si NO hay inventario en memoria, mostramos el cargador
+
+    # --- INICIALIZAR ESTADO DE LA LISTA DE REVISIÓN ---
+    if 'lista_revision' not in st.session_state:
+        st.session_state.lista_revision = []
+
+    # 1. CARGA DE ARCHIVO (Persistente)
     if st.session_state.df_inventario_diario is None:
         st.markdown("Sube el archivo del día para comenzar.")
         uploaded_file = st.file_uploader("📤 Sube Inventario de Hoy (Excel/CSV)", type=['csv', 'xlsx'])
@@ -110,61 +113,116 @@ if vista == "🔍 Revisar Existencias":
         if uploaded_file:
             try:
                 with st.spinner("Procesando e indexando..."):
-                    # 1. Leer archivo
+                    # Leer archivo
                     if uploaded_file.name.endswith('.csv'):
                         try: df_inv = pd.read_csv(uploaded_file, header=1, encoding='latin-1')
                         except: uploaded_file.seek(0); df_inv = pd.read_csv(uploaded_file, header=1, encoding='utf-8')
                     else:
                         df_inv = pd.read_excel(uploaded_file, header=1)
 
-                    # 2. Limpiar (Tijuana)
+                    # Limpiar
                     df_tj = df_inv.iloc[:, [0, 1, 5, 6]].copy()
                     df_tj.columns = ['CODIGO', 'PRODUCTO_INV', 'CORTA_CAD', 'EXISTENCIA']
                     df_tj = df_tj.dropna(subset=['CODIGO'])
                     df_tj['CODIGO'] = df_tj['CODIGO'].astype(str).str.strip()
 
-                    # 3. Cruzar con Catálogo Maestro (Optimización: Se hace UNA VEZ al subir)
+                    # Cruzar
                     df_merged = pd.merge(df_tj, df_productos[['CODIGO', 'SUSTANCIA']], on='CODIGO', how='left')
                     df_merged['SUSTANCIA'] = df_merged['SUSTANCIA'].fillna('---')
                     
-                    # 4. Crear índice rápido (Optimización: Se hace UNA VEZ al subir)
+                    # Índice
                     df_merged['INDICE_BUSQUEDA'] = (
                         df_merged['CODIGO'] + " " + 
                         df_merged['PRODUCTO_INV'] + " " + 
                         df_merged['SUSTANCIA']
                     ).str.upper()
 
-                    # 5. Guardar en Memoria de Sesión
+                    # Guardar en memoria
                     cols_finales = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
                     st.session_state.df_inventario_diario = df_merged[cols_finales]
-                    
-                    st.rerun() # Recargar página para mostrar buscador
+                    st.rerun()
             except Exception as e:
                 st.error(f"Error procesando archivo diario: {e}")
                 
-    # Si SÍ hay inventario en memoria, mostramos el buscador directo
     else:
+        # --- INTERFAZ DE BÚSQUEDA ---
         col_search, col_reset = st.columns([4, 1])
         with col_reset:
-            if st.button("🔄 Cargar Otro"):
+            if st.button("🔄 Cargar Otro Archivo"):
                 st.session_state.df_inventario_diario = None
                 st.rerun()
         
-        # Buscador Ultra Rápido (Usa datos en memoria)
         df_memoria = st.session_state.df_inventario_diario
-        
         busqueda = st.text_input("¿Qué buscas?", placeholder="Nombre, Clave o Sustancia...").upper()
         
+        resultados = pd.DataFrame()
+        
         if busqueda:
-            # Filtro simple sobre columna pre-calculada
             mask = df_memoria['INDICE_BUSQUEDA'].str.contains(busqueda, na=False)
+            # Mostramos resultados listos para seleccionar
             resultados = df_memoria[mask].drop(columns=['INDICE_BUSQUEDA'])
             st.success(f"Encontrados: {len(resultados)}")
-            st.dataframe(resultados, use_container_width=True, hide_index=True)
+            
+            # TABLA INTERACTIVA CON SELECCIÓN
+            # on_select="rerun" permite capturar qué filas seleccionaste
+            event = st.dataframe(
+                resultados,
+                use_container_width=True,
+                hide_index=True,
+                on_select="rerun", 
+                selection_mode="multi-row"
+            )
+            
+            # BOTÓN PARA AGREGAR LO SELECCIONADO
+            if len(event.selection.rows) > 0:
+                if st.button(f"⬇️ Agregar ({len(event.selection.rows)}) a mi Revisión"):
+                    # Obtener los datos de las filas seleccionadas
+                    filas_seleccionadas = resultados.iloc[event.selection.rows]
+                    
+                    # Convertir a diccionario y agregar a la lista
+                    nuevos_items = filas_seleccionadas.to_dict('records')
+                    st.session_state.lista_revision.extend(nuevos_items)
+                    st.toast("✅ Agregado a la tabla inferior")
         else:
             st.info("Inventario cargado. Escribe arriba para filtrar.")
-            st.dataframe(df_memoria.drop(columns=['INDICE_BUSQUEDA']).head(10), use_container_width=True, hide_index=True)
 
+        # --- SECCIÓN INFERIOR: TABLA DE REVISIÓN ACUMULADA ---
+        st.divider()
+        st.subheader("📋 Tu Lista de Revisión")
+        
+        col_info, col_borrar = st.columns([4, 1])
+        if st.session_state.lista_revision:
+            df_rev = pd.DataFrame(st.session_state.lista_revision)
+            
+            # Función para dar color (Rojo, Amarillo o Nada)
+            def estilo_existencias(row):
+                existencia = pd.to_numeric(row['EXISTENCIA'], errors='coerce') or 0
+                corta_cad = pd.to_numeric(row['CORTA_CAD'], errors='coerce') or 0
+                
+                colores = [''] * len(row)
+                
+                if existencia and corta_cad == 0:
+                    # ROJO CLARO si no hay nada
+                    colores = ['background-color: #ffcccc'] * len(row)
+                elif corta_cad > 0:
+                    # AMARILLO CLARO si hay corta caducidad (y existencia > 0)
+                    colores = ['background-color: #fffbcc'] * len(row)
+                
+                return colores
+
+            # Aplicar estilos
+            st.dataframe(
+                df_rev.style.apply(estilo_existencias, axis=1),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            with col_borrar:
+                if st.button("🗑️ Limpiar Lista"):
+                    st.session_state.lista_revision = []
+                    st.rerun()
+        else:
+            st.caption("Aquí irán apareciendo los productos que selecciones arriba.")
 
 # ==============================================================================
 # VISTA 2: REPORTAR FALTANTES (POS)
