@@ -201,12 +201,12 @@ if vista == "🔍 Revisar Existencias":
                 
                 colores = [''] * len(row)
                 
-                if existencia and corta_cad == 0:
+                if existencia == 0:
                     # ROJO CLARO si no hay nada
-                    colores = ['background-color: #ffcccc'] * len(row)
+                    colores = ['background-color: #390D10'] * len(row)
                 elif corta_cad > 0:
                     # AMARILLO CLARO si hay corta caducidad (y existencia > 0)
-                    colores = ['background-color: #fffbcc'] * len(row)
+                    colores = ['background-color: #4B3718'] * len(row)
                 
                 return colores
 
