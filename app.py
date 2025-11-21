@@ -14,11 +14,14 @@ FILE_PRODUCTOS = 'productos.csv'
 FILE_PLANTILLA = 'plantilla.xlsx'
 FILE_IMAGEN = 'logo.png'
 
-# --- ESTADO DE LA APP (Para Faltantes) ---
+# --- ESTADO DE LA APP (MEMORIA) ---
+# Faltantes
 if 'pedidos' not in st.session_state: st.session_state.pedidos = []
 if 'carrito' not in st.session_state: st.session_state.carrito = []
+# Inventario (Nueva variable para persistencia)
+if 'df_inventario_diario' not in st.session_state: st.session_state.df_inventario_diario = None
 
-# --- FUNCIÓN DE CARGA DE DATOS (Compartida) ---
+# --- FUNCIÓN DE CARGA DE DATOS (CATÁLOGOS MAESTROS) ---
 @st.cache_data
 def cargar_catalogos():
     errores = []
@@ -61,7 +64,7 @@ def cargar_catalogos():
         if 'SUSTANCIA' not in df_prod.columns: df_prod['SUSTANCIA'] = '---'
         else: df_prod['SUSTANCIA'] = df_prod['SUSTANCIA'].fillna('---')
 
-        # Índice de búsqueda
+        # Índice de búsqueda optimizado (Pre-cálculo)
         df_prod['SEARCH_INDEX'] = (
             df_prod['CODIGO'].astype(str) + " | " + 
             df_prod['DESCRIPCION'].astype(str) + " | " + 
@@ -80,9 +83,15 @@ df_clientes, df_productos, logs = cargar_catalogos()
 with st.sidebar:
     st.title("Navegación")
     vista = st.radio("Ir a:", ["🔍 Revisar Existencias", "📝 Reportar Faltantes"])
-    
     st.divider()
-    st.info(f"Catálogo: {len(df_productos)} productos")
+    
+    # Indicadores de estado
+    st.caption("Estado del Sistema:")
+    if st.session_state.df_inventario_diario is not None:
+        st.success("✅ Inventario Diario Cargado")
+    else:
+        st.warning("⚠️ Falta Inventario Diario")
+        
     if logs:
         for l in logs: st.error(l)
 
@@ -90,53 +99,72 @@ with st.sidebar:
 # VISTA 1: REVISAR EXISTENCIAS (INVENTARIO DIARIO)
 # ==============================================================================
 if vista == "🔍 Revisar Existencias":
-    st.header("🔍 Buscador de Existencias (Inventario Diario)")
-    st.markdown("Sube el archivo que te mandan diario para cruzarlo con el catálogo.")
+    st.header("🔍 Buscador de Existencias")
     
-    # 1. Subir Archivo Diario
-    uploaded_file = st.file_uploader("📤 Sube Inventario de Hoy (Excel/CSV)", type=['csv', 'xlsx'])
-    
-    if uploaded_file:
-        try:
-            # Leer archivo diario
-            if uploaded_file.name.endswith('.csv'):
-                try: df_inv = pd.read_csv(uploaded_file, header=1, encoding='latin-1')
-                except: uploaded_file.seek(0); df_inv = pd.read_csv(uploaded_file, header=1, encoding='utf-8')
-            else:
-                df_inv = pd.read_excel(uploaded_file, header=1)
+    # LÓGICA DE PERSISTENCIA:
+    # Si NO hay inventario en memoria, mostramos el cargador
+    if st.session_state.df_inventario_diario is None:
+        st.markdown("Sube el archivo del día para comenzar.")
+        uploaded_file = st.file_uploader("📤 Sube Inventario de Hoy (Excel/CSV)", type=['csv', 'xlsx'])
+        
+        if uploaded_file:
+            try:
+                with st.spinner("Procesando e indexando..."):
+                    # 1. Leer archivo
+                    if uploaded_file.name.endswith('.csv'):
+                        try: df_inv = pd.read_csv(uploaded_file, header=1, encoding='latin-1')
+                        except: uploaded_file.seek(0); df_inv = pd.read_csv(uploaded_file, header=1, encoding='utf-8')
+                    else:
+                        df_inv = pd.read_excel(uploaded_file, header=1)
 
-            # Limpiar (Tijuana)
-            df_tj = df_inv.iloc[:, [0, 1, 5, 6]].copy()
-            df_tj.columns = ['CODIGO', 'PRODUCTO_INV', 'CORTA_CAD', 'EXISTENCIA']
-            df_tj = df_tj.dropna(subset=['CODIGO'])
-            df_tj['CODIGO'] = df_tj['CODIGO'].astype(str).str.strip()
+                    # 2. Limpiar (Tijuana)
+                    df_tj = df_inv.iloc[:, [0, 1, 5, 6]].copy()
+                    df_tj.columns = ['CODIGO', 'PRODUCTO_INV', 'CORTA_CAD', 'EXISTENCIA']
+                    df_tj = df_tj.dropna(subset=['CODIGO'])
+                    df_tj['CODIGO'] = df_tj['CODIGO'].astype(str).str.strip()
 
-            # Cruzar con Catálogo Maestro (para tener Sustancias)
-            # Usamos df_productos que ya cargamos de GitHub
-            df_merged = pd.merge(df_tj, df_productos[['CODIGO', 'SUSTANCIA']], on='CODIGO', how='left')
-            df_merged['SUSTANCIA'] = df_merged['SUSTANCIA'].fillna('---')
-            
-            # Crear índice rápido local
-            df_merged['INDICE_BUSQUEDA'] = (
-                df_merged['CODIGO'] + " " + 
-                df_merged['PRODUCTO_INV'] + " " + 
-                df_merged['SUSTANCIA']
-            ).str.upper()
+                    # 3. Cruzar con Catálogo Maestro (Optimización: Se hace UNA VEZ al subir)
+                    df_merged = pd.merge(df_tj, df_productos[['CODIGO', 'SUSTANCIA']], on='CODIGO', how='left')
+                    df_merged['SUSTANCIA'] = df_merged['SUSTANCIA'].fillna('---')
+                    
+                    # 4. Crear índice rápido (Optimización: Se hace UNA VEZ al subir)
+                    df_merged['INDICE_BUSQUEDA'] = (
+                        df_merged['CODIGO'] + " " + 
+                        df_merged['PRODUCTO_INV'] + " " + 
+                        df_merged['SUSTANCIA']
+                    ).str.upper()
 
-            # Buscador
-            busqueda = st.text_input("¿Qué buscas?", placeholder="Nombre, Clave o Sustancia...").upper()
-            
-            if busqueda:
-                mask = df_merged['INDICE_BUSQUEDA'].str.contains(busqueda, na=False)
-                resultados = df_merged[mask][['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD']]
-                st.success(f"Encontrados: {len(resultados)}")
-                st.dataframe(resultados, use_container_width=True, hide_index=True)
-            else:
-                st.info("Escribe arriba para filtrar.")
-                st.dataframe(df_merged[['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD']].head(10), use_container_width=True, hide_index=True)
+                    # 5. Guardar en Memoria de Sesión
+                    cols_finales = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
+                    st.session_state.df_inventario_diario = df_merged[cols_finales]
+                    
+                    st.rerun() # Recargar página para mostrar buscador
+            except Exception as e:
+                st.error(f"Error procesando archivo diario: {e}")
+                
+    # Si SÍ hay inventario en memoria, mostramos el buscador directo
+    else:
+        col_search, col_reset = st.columns([4, 1])
+        with col_reset:
+            if st.button("🔄 Cargar Otro"):
+                st.session_state.df_inventario_diario = None
+                st.rerun()
+        
+        # Buscador Ultra Rápido (Usa datos en memoria)
+        df_memoria = st.session_state.df_inventario_diario
+        
+        busqueda = st.text_input("¿Qué buscas?", placeholder="Nombre, Clave o Sustancia...").upper()
+        
+        if busqueda:
+            # Filtro simple sobre columna pre-calculada
+            mask = df_memoria['INDICE_BUSQUEDA'].str.contains(busqueda, na=False)
+            resultados = df_memoria[mask].drop(columns=['INDICE_BUSQUEDA'])
+            st.success(f"Encontrados: {len(resultados)}")
+            st.dataframe(resultados, use_container_width=True, hide_index=True)
+        else:
+            st.info("Inventario cargado. Escribe arriba para filtrar.")
+            st.dataframe(df_memoria.drop(columns=['INDICE_BUSQUEDA']).head(10), use_container_width=True, hide_index=True)
 
-        except Exception as e:
-            st.error(f"Error procesando archivo diario: {e}")
 
 # ==============================================================================
 # VISTA 2: REPORTAR FALTANTES (POS)
@@ -144,7 +172,7 @@ if vista == "🔍 Revisar Existencias":
 elif vista == "📝 Reportar Faltantes":
     st.header("📝 Generador de Reporte de Faltantes")
     
-    # Callbacks (Lógica de limpieza)
+    # Callbacks
     def agregar_producto():
         cliente = st.session_state.cliente_box
         prod_str = st.session_state.prod_box
@@ -235,14 +263,13 @@ elif vista == "📝 Reportar Faltantes":
                     try: ws['B6'] = int(cod)
                     except: ws['B6'] = cod
                     
-                    # Insertar Imagen
+                    # Insertar Imagen (con manejo de errores si no existe)
                     try:
                         img = Image(FILE_IMAGEN)
                         img.width = 270; img.height = 80; img.anchor = 'D1'
                         ws.add_image(img)
                     except: pass
                     
-                    # Datos
                     datos = p['items'][['CODIGO', 'DESCRIPCION', 'SOLICITADA', 'SURTIDO', 'O.C.']].values.tolist()
                     for idx, row in enumerate(datos):
                         for c, val in enumerate(row): ws.cell(row=10+idx, column=c+1, value=val)
