@@ -253,7 +253,7 @@ if vista == "🔍 Revisar Existencias":
                         if ex == 0 and cc == 0:
                             # Rojo (#fe9292) si no hay nada
                             fila_color = ['#fe9292'] * len(df_rev.columns)
-                        elif ex =! 0 and cc > 0:
+                        elif ex == 0 and cc > 0:
                             # Amarillo (#ffe59a) si hay corta caducidad
                             fila_color = ['#ffe59a'] * len(df_rev.columns)
                         else:
