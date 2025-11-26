@@ -223,7 +223,7 @@ if vista == "🔍 Revisar Existencias":
                 
                 if existencia == 0 and corta_cad == 0:
                     colores = ['background-color: #390D10'] * len(row) # Rojo Oscuro
-                elif corta_cad > 0:
+                elif existencia == 0 and corta_cad > 0:
                     colores = ['background-color: #4B3718'] * len(row) # Amarillo Oscuro
                 
                 return colores
@@ -239,28 +239,53 @@ if vista == "🔍 Revisar Existencias":
                     st.session_state.lista_revision = []
                     st.rerun()
 
-            # --- NUEVO: DESCARGAR COMO IMAGEN ---
+            # --- NUEVO: DESCARGAR COMO IMAGEN MEJORADA ---
             if st.button("📸 Descargar Tabla como Imagen"):
                 try:
-                    # Crear figura simple con Matplotlib
-                    fig, ax = plt.subplots(figsize=(12, len(df_rev) * 0.5 + 1)) # Altura dinámica
+                    # 1. PREPARAR COLORES
+                    # Creamos una matriz de colores del mismo tamaño que los datos
+                    cell_colors = []
+                    for _, row in df_rev.iterrows():
+                        ex = pd.to_numeric(row['EXISTENCIA'], errors='coerce') or 0
+                        cc = pd.to_numeric(row['CORTA_CAD'], errors='coerce') or 0
+                        
+                        # LÓGICA DE COLORES SOLICITADA
+                        if ex == 0 and cc == 0:
+                            # Rojo (#fe9292) si no hay nada
+                            fila_color = ['#fe9292'] * len(df_rev.columns)
+                        elif cc > 0:
+                            # Amarillo (#ffe59a) si hay corta caducidad
+                            fila_color = ['#ffe59a'] * len(df_rev.columns)
+                        else:
+                            # Blanco normal
+                            fila_color = ['#ffffff'] * len(df_rev.columns)
+                        
+                        cell_colors.append(fila_color)
+
+                    # 2. CREAR FIGURA MÁS ANCHA (Para que quepa el texto)
+                    # Aumentamos el ancho (20) y la altura dinámica
+                    fig, ax = plt.subplots(figsize=(20, len(df_rev) * 0.8 + 2)) 
                     ax.axis('tight')
                     ax.axis('off')
                     
-                    # Dibujar tabla
+                    # 3. DIBUJAR TABLA CON COLORES
                     tabla = ax.table(
                         cellText=df_rev.values,
                         colLabels=df_rev.columns,
+                        cellColours=cell_colors, # <--- Aquí aplicamos los colores
                         cellLoc='center',
                         loc='center'
                     )
                     
-                    # Estilo básico de la tabla
+                    # 4. AUTO-AJUSTAR ANCHO DE COLUMNAS
                     tabla.auto_set_font_size(False)
-                    tabla.set_fontsize(10)
-                    tabla.scale(1.2, 1.2)
+                    tabla.set_fontsize(12)
+                    tabla.scale(1, 1.5) # Hacemos las filas un poco más altas para que respiren
                     
-                    # Guardar en buffer
+                    # Esta es la magia para que el texto no se corte:
+                    tabla.auto_set_column_width(col=list(range(len(df_rev.columns))))
+                    
+                    # Guardar
                     buf = BytesIO()
                     plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
                     buf.seek(0)
