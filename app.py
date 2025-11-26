@@ -253,7 +253,7 @@ if vista == "🔍 Revisar Existencias":
                         if ex == 0 and cc == 0:
                             # Rojo (#fe9292) si no hay nada
                             fila_color = ['#fe9292'] * len(df_rev.columns)
-                        elif cc > 0:
+                        elif ex =! 0 and cc > 0:
                             # Amarillo (#ffe59a) si hay corta caducidad
                             fila_color = ['#ffe59a'] * len(df_rev.columns)
                         else:
@@ -264,7 +264,7 @@ if vista == "🔍 Revisar Existencias":
 
                     # 2. CREAR FIGURA MÁS ANCHA (Para que quepa el texto)
                     # Aumentamos el ancho (20) y la altura dinámica
-                    fig, ax = plt.subplots(figsize=(12, len(df_rev) + 1)) 
+                    fig, ax = plt.subplots(figsize=(12, len(df_rev) * 0.3 + 2)) 
                     ax.axis('tight')
                     ax.axis('off')
                     
