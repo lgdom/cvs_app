@@ -4,6 +4,7 @@ import openpyxl
 from openpyxl.drawing.image import Image
 from io import BytesIO
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Sistema Ventas", page_icon="💊", layout="wide")
@@ -94,7 +95,7 @@ with st.sidebar:
         
     if logs:
         for l in logs: st.error(l)
-
+            
 # ==============================================================================
 # VISTA 1: REVISAR EXISTENCIAS (INVENTARIO DIARIO)
 # ==============================================================================
@@ -105,8 +106,6 @@ if vista == "🔍 Revisar Existencias":
     if 'lista_revision' not in st.session_state:
         st.session_state.lista_revision = []
     
-    # TRUCO PARA LIMPIAR SELECCIÓN:
-    # Usaremos este contador para cambiar la 'key' de la tabla y forzar su reinicio
     if 'reset_counter' not in st.session_state:
         st.session_state.reset_counter = 0
 
@@ -162,8 +161,6 @@ if vista == "🔍 Revisar Existencias":
             resultados = df_memoria[mask].drop(columns=['INDICE_BUSQUEDA'])
             st.success(f"Encontrados: {len(resultados)}")
             
-            # TABLA CON KEY DINÁMICA (table_0, table_1...)
-            # Cada vez que aumentamos el contador, la tabla se "renueva" y pierde la selección.
             dynamic_key = f"search_table_{st.session_state.reset_counter}"
             
             event = st.dataframe(
@@ -172,19 +169,30 @@ if vista == "🔍 Revisar Existencias":
                 hide_index=True,
                 on_select="rerun", 
                 selection_mode="multi-row",
-                key=dynamic_key # <--- LA CLAVE MÁGICA
+                key=dynamic_key 
             )
             
             if len(event.selection.rows) > 0:
-                if st.button(f"⬇️ Agregar ({len(event.selection.rows)}) a mi Revisión"):
-                    filas_seleccionadas = resultados.iloc[event.selection.rows]
+                st.divider()
+                # --- NUEVO: COLUMNAS PARA BOTÓN Y CANTIDAD ---
+                c_btn, c_qty = st.columns([3, 1])
+                
+                # Input de cantidad (opcional, por defecto 0)
+                qty_add = c_qty.number_input("Piezas (Opcional):", min_value=0, value=0, key="qty_add_rev")
+                
+                if c_btn.button(f"⬇️ Agregar Selección ({len(event.selection.rows)})"):
+                    filas_seleccionadas = resultados.iloc[event.selection.rows].copy()
+                    
+                    # Agregar columna de piezas
+                    # Si es 0, mostramos "-", si tiene número, lo mostramos.
+                    filas_seleccionadas['SOLICITADO'] = qty_add if qty_add > 0 else "-"
+                    
                     nuevos_items = filas_seleccionadas.to_dict('records')
                     st.session_state.lista_revision.extend(nuevos_items)
                     
-                    # --- AQUÍ OCURRE EL RESET ---
-                    st.session_state.reset_counter += 1 # Cambiamos la ID de la tabla
+                    st.session_state.reset_counter += 1 
                     st.toast("✅ Agregado")
-                    st.rerun() # Recargamos para que aparezca la tabla "nueva" limpia
+                    st.rerun() 
         else:
             st.info("Inventario cargado. Escribe arriba para filtrar.")
 
@@ -193,10 +201,20 @@ if vista == "🔍 Revisar Existencias":
         st.subheader("📋 Tu Lista de Revisión")
         
         col_info, col_borrar = st.columns([4, 1])
+        
         if st.session_state.lista_revision:
             df_rev = pd.DataFrame(st.session_state.lista_revision)
             
-            # TU LÓGICA DE COLORES PERSONALIZADA
+            # Reordenar para que SOLICITADO salga al principio o final según gusto
+            # Aquí lo pongo al final
+            cols_orden = ['CODIGO', 'PRODUCTO_INV', 'EXISTENCIA', 'CORTA_CAD', 'SOLICITADO']
+            # Aseguramos que existan las columnas (por si viejos registros no la tienen)
+            for c in cols_orden:
+                if c not in df_rev.columns: df_rev[c] = "-"
+            
+            df_rev = df_rev[cols_orden]
+
+            # ESTILOS (Tu lógica corregida)
             def estilo_existencias(row):
                 existencia = pd.to_numeric(row['EXISTENCIA'], errors='coerce') or 0
                 corta_cad = pd.to_numeric(row['CORTA_CAD'], errors='coerce') or 0
@@ -204,11 +222,9 @@ if vista == "🔍 Revisar Existencias":
                 colores = [''] * len(row)
                 
                 if existencia == 0 and corta_cad == 0:
-                    # ROJO CLARO (Tono oscuro para Dark Mode)
-                    colores = ['background-color: #390D10'] * len(row)
-                elif existencia == 0 and corta_cad > 0:
-                    # AMARILLO CLARO (Tono oscuro para Dark Mode)
-                    colores = ['background-color: #4B3718'] * len(row)
+                    colores = ['background-color: #390D10'] * len(row) # Rojo Oscuro
+                elif corta_cad > 0:
+                    colores = ['background-color: #4B3718'] * len(row) # Amarillo Oscuro
                 
                 return colores
 
@@ -222,8 +238,45 @@ if vista == "🔍 Revisar Existencias":
                 if st.button("🗑️ Limpiar Lista"):
                     st.session_state.lista_revision = []
                     st.rerun()
+
+            # --- NUEVO: DESCARGAR COMO IMAGEN ---
+            if st.button("📸 Descargar Tabla como Imagen"):
+                try:
+                    # Crear figura simple con Matplotlib
+                    fig, ax = plt.subplots(figsize=(12, len(df_rev) * 0.5 + 1)) # Altura dinámica
+                    ax.axis('tight')
+                    ax.axis('off')
+                    
+                    # Dibujar tabla
+                    tabla = ax.table(
+                        cellText=df_rev.values,
+                        colLabels=df_rev.columns,
+                        cellLoc='center',
+                        loc='center'
+                    )
+                    
+                    # Estilo básico de la tabla
+                    tabla.auto_set_font_size(False)
+                    tabla.set_fontsize(10)
+                    tabla.scale(1.2, 1.2)
+                    
+                    # Guardar en buffer
+                    buf = BytesIO()
+                    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
+                    buf.seek(0)
+                    
+                    st.download_button(
+                        label="⬇️ Guardar PNG",
+                        data=buf,
+                        file_name="Lista_Revision.png",
+                        mime="image/png"
+                    )
+                except Exception as e:
+                    st.error(f"Error generando imagen: {e}")
+
         else:
-            st.caption("Aquí irán apareciendo los productos que selecciones arriba.")
+            st.caption("Selecciona productos arriba para armar tu lista de revisión.")
+
 
 # ==============================================================================
 # VISTA 2: REPORTAR FALTANTES (POS)
