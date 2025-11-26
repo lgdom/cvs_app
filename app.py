@@ -264,7 +264,7 @@ if vista == "🔍 Revisar Existencias":
 
                     # 2. CREAR FIGURA MÁS ANCHA (Para que quepa el texto)
                     # Aumentamos el ancho (20) y la altura dinámica
-                    fig, ax = plt.subplots(figsize=(15, len(df_rev) * 0.8 + 2)) 
+                    fig, ax = plt.subplots(figsize=(10, len(df_rev) * 0.8 + 2)) 
                     ax.axis('tight')
                     ax.axis('off')
                     
