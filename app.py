@@ -284,7 +284,7 @@ if vista == "🔍 Revisar Existencias":
                     ancho_dinamico = max(10, num_cols * 2.5) 
                     
                     # Alto: 0.5 pulgadas por fila + espacio extra para encabezados/títulos
-                    alto_dinamico = num_filas * 0.5 + 2 
+                    alto_dinamico = num_filas * 0.5
                     
                     if cliente_foto: alto_dinamico += 1
                     if hay_rojo or hay_amarillo: alto_dinamico += 1
