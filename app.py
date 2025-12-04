@@ -5,6 +5,7 @@ from openpyxl.drawing.image import Image
 from io import BytesIO
 from datetime import datetime
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Sistema Ventas", page_icon="💊", layout="wide")
@@ -239,52 +240,114 @@ if vista == "🔍 Revisar Existencias":
                     st.session_state.lista_revision = []
                     st.rerun()
 
-            # --- NUEVO: DESCARGAR COMO IMAGEN MEJORADA ---
+            # --- NUEVO: CONFIGURACIÓN DE IMAGEN ---
+            st.divider()
+            st.caption("Configuración de la Imagen:")
+            
+            # Controles para personalizar la foto
+            c_cli, c_opt = st.columns([2, 1])
+            
+            with c_cli:
+                # Selector de cliente (Opcional)
+                cliente_foto = st.selectbox(
+                    "Agregar Título de Cliente (Opcional):", 
+                    options=df_clientes['DISPLAY'], 
+                    index=None, 
+                    placeholder="Selecciona para poner título...",
+                    key="cli_foto_input"
+                )
+                
+            with c_opt:
+                # Checkbox para sustancia
+                incluir_sustancia = st.checkbox("Incluir columna 'Sustancia'", value=True)
+
             if st.button("📸 Descargar Tabla como Imagen"):
                 try:
-                    # 1. PREPARAR COLORES
-                    # Creamos una matriz de colores del mismo tamaño que los datos
+                    # 1. PREPARAR DATOS (Filtrar columnas)
+                    df_plot = df_rev.copy()
+                    
+                    if not incluir_sustancia:
+                        # Si desmarcan el checkbox, quitamos la columna (si existe)
+                        if 'SUSTANCIA' in df_plot.columns:
+                            df_plot = df_plot.drop(columns=['SUSTANCIA'])
+                            
+                    # 2. PREPARAR COLORES Y LEYENDA
                     cell_colors = []
-                    for _, row in df_rev.iterrows():
+                    
+                    # Banderas para saber si mostramos la leyenda
+                    hay_rojo = False
+                    hay_amarillo = False
+                    
+                    for _, row in df_plot.iterrows():
                         ex = pd.to_numeric(row['EXISTENCIA'], errors='coerce') or 0
                         cc = pd.to_numeric(row['CORTA_CAD'], errors='coerce') or 0
                         
-                        # LÓGICA DE COLORES SOLICITADA
+                        # Tu lógica de colores
                         if ex == 0 and cc == 0:
-                            # Rojo (#fe9292) si no hay nada
-                            fila_color = ['#fe9292'] * len(df_rev.columns)
-                        elif ex == 0 and cc > 0:
-                            # Amarillo (#ffe59a) si hay corta caducidad
-                            fila_color = ['#ffe59a'] * len(df_rev.columns)
+                            fila_color = ['#fe9292'] * len(df_plot.columns) # Rojo
+                            hay_rojo = True
+                        elif cc > 0:
+                            fila_color = ['#ffe59a'] * len(df_plot.columns) # Amarillo
+                            hay_amarillo = True
                         else:
-                            # Blanco normal
-                            fila_color = ['#ffffff'] * len(df_rev.columns)
+                            fila_color = ['#ffffff'] * len(df_plot.columns) # Blanco
                         
                         cell_colors.append(fila_color)
 
-                    # 2. CREAR FIGURA MÁS ANCHA (Para que quepa el texto)
-                    # Aumentamos el ancho (20) y la altura dinámica
-                    fig, ax = plt.subplots(figsize=(12, len(df_rev) * 0.3 + 2)) 
+                    # 3. CALCULAR TAMAÑO DE FIGURA
+                    # Base: 0.35 por fila
+                    altura_base = len(df_plot) * 0.35 + 1
+                    
+                    # Espacio extra si hay título (+1 pulgada)
+                    if cliente_foto: altura_base += 1
+                    # Espacio extra si hay leyenda (+1 pulgada)
+                    if hay_rojo or hay_amarillo: altura_base += 1
+                    
+                    fig, ax = plt.subplots(figsize=(12, altura_base)) 
                     ax.axis('tight')
                     ax.axis('off')
                     
-                    # 3. DIBUJAR TABLA CON COLORES
+                    # 4. TÍTULO (Opcional)
+                    if cliente_foto:
+                        cod, nom = cliente_foto.split(" - ", 1)
+                        # Título centrado: Nombre arriba, código abajo
+                        plt.title(f"{nom}\n{cod}", fontsize=14, fontweight='bold', pad=20)
+
+                    # 5. DIBUJAR TABLA
                     tabla = ax.table(
-                        cellText=df_rev.values,
-                        colLabels=df_rev.columns,
-                        cellColours=cell_colors, # <--- Aquí aplicamos los colores
+                        cellText=df_plot.values,
+                        colLabels=df_plot.columns,
+                        cellColours=cell_colors,
                         cellLoc='center',
-                        loc='center'
+                        loc='center' # Centrada en el gráfico
                     )
                     
-                    # 4. AUTO-AJUSTAR ANCHO DE COLUMNAS
+                    # Estilos de tabla
                     tabla.auto_set_font_size(False)
-                    tabla.set_fontsize(12)
-                    tabla.scale(1, 1.5) # Hacemos las filas un poco más altas para que respiren
+                    tabla.set_fontsize(10)
+                    tabla.scale(1, 1.2)
+                    tabla.auto_set_column_width(col=list(range(len(df_plot.columns))))
                     
-                    # Esta es la magia para que el texto no se corte:
-                    tabla.auto_set_column_width(col=list(range(len(df_rev.columns))))
+                    # 6. AGREGAR LEYENDA AUTOMÁTICA
+                    leyendas = []
+                    if hay_amarillo:
+                        patch_y = mpatches.Patch(color='#ffe59a', label='DISPONIBLE SOLO EN CORTA CADUCIDAD')
+                        leyendas.append(patch_y)
                     
+                    if hay_rojo:
+                        patch_r = mpatches.Patch(color='#fe9292', label='NO DISPONIBLE')
+                        leyendas.append(patch_r)
+                        
+                    if leyendas:
+                        # Ponemos la leyenda abajo, centrada
+                        plt.legend(
+                            handles=leyendas, 
+                            loc='lower center', 
+                            bbox_to_anchor=(0.5, -0.05), # Un poco más abajo de la tabla
+                            ncol=1 if len(leyendas) == 1 else 2, # Si son 2, ponerlas en fila
+                            frameon=False # Sin borde
+                        )
+
                     # Guardar
                     buf = BytesIO()
                     plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
