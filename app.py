@@ -278,7 +278,7 @@ if vista == "🔍 Revisar Existencias":
 
                     # 3. DIMENSIONES (Restauramos la lógica vertical que funcionaba)
                     # Altura base: 0.35 por fila (un poco más de aire que 0.3)
-                    altura_base = len(df_plot) * 0.35
+                    altura_base = len(df_plot) * 0.35 + 1
                     
                     if cliente_foto: altura_base += 0.2 # Espacio para título
                     if hay_rojo or hay_amarillo: altura_base += 0.2 # Espacio para leyenda
