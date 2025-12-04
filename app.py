@@ -281,13 +281,13 @@ if vista == "🔍 Revisar Existencias":
                     num_cols = len(df_plot.columns)
                     
                     # Ancho: 2.5 pulgadas por columna (aprox) para dar buen espacio al texto
-                    ancho_dinamico = max(10, num_cols * 2.5) 
+                    ancho_dinamico = max(10, num_cols * 1.25) 
                     
                     # Alto: 0.5 pulgadas por fila + espacio extra para encabezados/títulos
-                    alto_dinamico = num_filas * 0.5
+                    alto_dinamico = num_filas * 0.35
                     
-                    if cliente_foto: alto_dinamico += 1
-                    if hay_rojo or hay_amarillo: alto_dinamico += 1
+                    if cliente_foto: alto_dinamico += 0.2
+                    if hay_rojo or hay_amarillo: alto_dinamico += 0.2
                     
                     fig, ax = plt.subplots(figsize=(ancho_dinamico, alto_dinamico)) 
                     ax.axis('off')
