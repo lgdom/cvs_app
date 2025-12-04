@@ -250,7 +250,7 @@ if vista == "🔍 Revisar Existencias":
 
             if st.button("📸 Descargar Tabla como Imagen"):
                 try:
-                    # 1. FILTRAR DATOS PARA LA FOTO
+                    # 1. FILTRAR DATOS
                     df_plot = df_rev.copy()
                     
                     if not incluir_sustancia:
@@ -276,35 +276,39 @@ if vista == "🔍 Revisar Existencias":
                             fila_color = ['#ffffff'] * len(df_plot.columns)
                         cell_colors.append(fila_color)
 
-                    # 3. DIMENSIONES AJUSTADAS (Menos espacio vertical)
-                    # Altura base reducida (0.3 por fila)
-                    altura_base = len(df_plot) * 0.3 + 0.5
-                    if cliente_foto: altura_base += 0.8
-                    if hay_rojo or hay_amarillo: altura_base += 0.5
+                    # 3. DIMENSIONES (Restauramos la lógica vertical que funcionaba)
+                    # Altura base: 0.35 por fila (un poco más de aire que 0.3)
+                    altura_base = len(df_plot) * 0.35 + 1
+                    
+                    if cliente_foto: altura_base += 1.0 # Espacio para título
+                    if hay_rojo or hay_amarillo: altura_base += 1.0 # Espacio para leyenda
                     
                     fig, ax = plt.subplots(figsize=(12, altura_base)) 
                     ax.axis('off')
                     
-                    # 4. TÍTULO (Más pegado a la tabla)
+                    # 4. TÍTULO (Ajuste "Medio")
                     if cliente_foto:
                         cod, nom = cliente_foto.split(" - ", 1)
-                        # pad=2 acerca el título a la tabla
-                        plt.title(f"{nom}\n{cod}", fontsize=14, fontweight='bold', pad=4)
+                        # pad=12: El punto medio ideal. Ni 20 (lejos), ni 4 (pegado).
+                        plt.title(f"{nom}\n{cod}", fontsize=14, fontweight='bold', pad=12)
 
-                    # 5. DIBUJAR TABLA "APRETADA"
+                    # 5. DIBUJAR TABLA (Restauramos la versión "elástica")
                     tabla = ax.table(
                         cellText=df_plot.values,
                         colLabels=df_plot.columns,
                         cellColours=cell_colors,
                         cellLoc='center',
-                        loc='center',
-                        bbox=[0, 0, 1, 1] # <--- ESTO ES CLAVE: Fuerza a la tabla a ocupar todo el espacio
+                        loc='center'
+                        # Quitamos el bbox=[0,0,1,1] que destruía el formato
                     )
                     
+                    # Restauramos el auto-ajuste y la escala que te gustaba
                     tabla.auto_set_font_size(False)
                     tabla.set_fontsize(10)
+                    tabla.scale(1, 1.2) # Escala vertical cómoda
+                    tabla.auto_set_column_width(col=list(range(len(df_plot.columns))))
                     
-                    # 6. LEYENDA (Más pegada a la tabla)
+                    # 6. LEYENDA
                     leyendas = []
                     if hay_amarillo:
                         leyendas.append(mpatches.Patch(color='#ffe59a', label='SOLO CORTA CAD.'))
@@ -314,8 +318,9 @@ if vista == "🔍 Revisar Existencias":
                     if leyendas:
                         plt.legend(
                             handles=leyendas, 
-                            loc='upper center', # La anclamos arriba de su caja
-                            bbox_to_anchor=(0.5, -0.01), # Justo pegadito debajo de la tabla (coordenada Y negativa pequeña)
+                            loc='upper center', 
+                            # Posicionamos la leyenda relativa a la tabla "flotante"
+                            bbox_to_anchor=(0.5, -0.02), 
                             ncol=2, 
                             frameon=False,
                             fontsize=9
@@ -323,11 +328,16 @@ if vista == "🔍 Revisar Existencias":
 
                     # Guardar
                     buf = BytesIO()
-                    # bbox_inches='tight' recorta todo el espacio blanco sobrante automáticamente
-                    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150, pad_inches=0.1)
+                    # bbox_inches='tight' se encargará de recortar el aire sobrante automáticamente
+                    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
                     buf.seek(0)
                     
-                    st.download_button("⬇️ Guardar PNG", data=buf, file_name="Lista_Revision.png", mime="image/png")
+                    st.download_button(
+                        label="⬇️ Guardar PNG",
+                        data=buf,
+                        file_name="Lista_Revision.png",
+                        mime="image/png"
+                    )
                 except Exception as e:
                     st.error(f"Error generando imagen: {e}")
 
