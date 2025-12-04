@@ -311,7 +311,7 @@ if vista == "🔍 Revisar Existencias":
                     # 6. LEYENDA
                     leyendas = []
                     if hay_amarillo:
-                        leyendas.append(mpatches.Patch(color='#ffe59a', label='SOLO CORTA CAD.'))
+                        leyendas.append(mpatches.Patch(color='#ffe59a', label='SOLO CORTA CADUCIDAD'))
                     if hay_rojo:
                         leyendas.append(mpatches.Patch(color='#fe9292', label='NO DISPONIBLE'))
                         
