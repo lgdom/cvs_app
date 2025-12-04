@@ -206,27 +206,25 @@ if vista == "🔍 Revisar Existencias":
         if st.session_state.lista_revision:
             df_rev = pd.DataFrame(st.session_state.lista_revision)
             
-            # Reordenar para que SOLICITADO salga al principio o final según gusto
-            # Aquí lo pongo al final
-            cols_orden = ['CODIGO', 'PRODUCTO_INV', 'EXISTENCIA', 'CORTA_CAD', 'SOLICITADO']
-            # Aseguramos que existan las columnas (por si viejos registros no la tienen)
+            # 1. CORRECCIÓN: Agregamos SUSTANCIA a la lista base para que exista
+            cols_orden = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'SOLICITADO']
+            
+            # Asegurar que existan las columnas
             for c in cols_orden:
                 if c not in df_rev.columns: df_rev[c] = "-"
             
             df_rev = df_rev[cols_orden]
 
-            # ESTILOS (Tu lógica corregida)
+            # Estilos visuales en pantalla
             def estilo_existencias(row):
                 existencia = pd.to_numeric(row['EXISTENCIA'], errors='coerce') or 0
                 corta_cad = pd.to_numeric(row['CORTA_CAD'], errors='coerce') or 0
                 
                 colores = [''] * len(row)
-                
                 if existencia == 0 and corta_cad == 0:
-                    colores = ['background-color: #390D10'] * len(row) # Rojo Oscuro
-                elif existencia == 0 and corta_cad > 0:
-                    colores = ['background-color: #4B3718'] * len(row) # Amarillo Oscuro
-                
+                    colores = ['background-color: #390D10'] * len(row)
+                elif corta_cad > 0:
+                    colores = ['background-color: #4B3718'] * len(row)
                 return colores
 
             st.dataframe(
@@ -240,41 +238,27 @@ if vista == "🔍 Revisar Existencias":
                     st.session_state.lista_revision = []
                     st.rerun()
 
-            # --- NUEVO: CONFIGURACIÓN DE IMAGEN ---
+            # --- CONFIGURACIÓN DE IMAGEN ---
             st.divider()
             st.caption("Configuración de la Imagen:")
             
-            # Controles para personalizar la foto
             c_cli, c_opt = st.columns([2, 1])
-            
             with c_cli:
-                # Selector de cliente (Opcional)
-                cliente_foto = st.selectbox(
-                    "Agregar Título de Cliente (Opcional):", 
-                    options=df_clientes['DISPLAY'], 
-                    index=None, 
-                    placeholder="Selecciona para poner título...",
-                    key="cli_foto_input"
-                )
-                
+                cliente_foto = st.selectbox("Título de Cliente (Opcional):", options=df_clientes['DISPLAY'], index=None, placeholder="Sin título...", key="cli_foto_input")
             with c_opt:
-                # Checkbox para sustancia
                 incluir_sustancia = st.checkbox("Incluir columna 'Sustancia'", value=True)
 
             if st.button("📸 Descargar Tabla como Imagen"):
                 try:
-                    # 1. PREPARAR DATOS (Filtrar columnas)
+                    # 1. FILTRAR DATOS PARA LA FOTO
                     df_plot = df_rev.copy()
                     
                     if not incluir_sustancia:
-                        # Si desmarcan el checkbox, quitamos la columna (si existe)
                         if 'SUSTANCIA' in df_plot.columns:
                             df_plot = df_plot.drop(columns=['SUSTANCIA'])
                             
-                    # 2. PREPARAR COLORES Y LEYENDA
+                    # 2. COLORES
                     cell_colors = []
-                    
-                    # Banderas para saber si mostramos la leyenda
                     hay_rojo = False
                     hay_amarillo = False
                     
@@ -282,89 +266,73 @@ if vista == "🔍 Revisar Existencias":
                         ex = pd.to_numeric(row['EXISTENCIA'], errors='coerce') or 0
                         cc = pd.to_numeric(row['CORTA_CAD'], errors='coerce') or 0
                         
-                        # Tu lógica de colores
                         if ex == 0 and cc == 0:
-                            fila_color = ['#fe9292'] * len(df_plot.columns) # Rojo
+                            fila_color = ['#fe9292'] * len(df_plot.columns)
                             hay_rojo = True
                         elif cc > 0:
-                            fila_color = ['#ffe59a'] * len(df_plot.columns) # Amarillo
+                            fila_color = ['#ffe59a'] * len(df_plot.columns)
                             hay_amarillo = True
                         else:
-                            fila_color = ['#ffffff'] * len(df_plot.columns) # Blanco
-                        
+                            fila_color = ['#ffffff'] * len(df_plot.columns)
                         cell_colors.append(fila_color)
 
-                    # 3. CALCULAR TAMAÑO DE FIGURA
-                    # Base: 0.35 por fila
-                    altura_base = len(df_plot) * 0.35 + 1
-                    
-                    # Espacio extra si hay título (+1 pulgada)
-                    if cliente_foto: altura_base += 0.2
-                    # Espacio extra si hay leyenda (+1 pulgada)
-                    if hay_rojo or hay_amarillo: altura_base += 0.2
+                    # 3. DIMENSIONES AJUSTADAS (Menos espacio vertical)
+                    # Altura base reducida (0.3 por fila)
+                    altura_base = len(df_plot) * 0.3 + 0.5
+                    if cliente_foto: altura_base += 0.8
+                    if hay_rojo or hay_amarillo: altura_base += 0.5
                     
                     fig, ax = plt.subplots(figsize=(12, altura_base)) 
-                    ax.axis('tight')
                     ax.axis('off')
                     
-                    # 4. TÍTULO (Opcional)
+                    # 4. TÍTULO (Más pegado a la tabla)
                     if cliente_foto:
                         cod, nom = cliente_foto.split(" - ", 1)
-                        # Título centrado: Nombre arriba, código abajo
-                        plt.title(f"{nom}\n{cod}", fontsize=14, fontweight='bold', pad=20)
+                        # pad=2 acerca el título a la tabla
+                        plt.title(f"{nom}\n{cod}", fontsize=14, fontweight='bold', pad=4)
 
-                    # 5. DIBUJAR TABLA
+                    # 5. DIBUJAR TABLA "APRETADA"
                     tabla = ax.table(
                         cellText=df_plot.values,
                         colLabels=df_plot.columns,
                         cellColours=cell_colors,
                         cellLoc='center',
-                        loc='center' # Centrada en el gráfico
+                        loc='center',
+                        bbox=[0, 0, 1, 1] # <--- ESTO ES CLAVE: Fuerza a la tabla a ocupar todo el espacio
                     )
                     
-                    # Estilos de tabla
                     tabla.auto_set_font_size(False)
                     tabla.set_fontsize(10)
-                    tabla.scale(1, 1.2)
-                    tabla.auto_set_column_width(col=list(range(len(df_plot.columns))))
                     
-                    # 6. AGREGAR LEYENDA AUTOMÁTICA
+                    # 6. LEYENDA (Más pegada a la tabla)
                     leyendas = []
                     if hay_amarillo:
-                        patch_y = mpatches.Patch(color='#ffe59a', label='DISPONIBLE SOLO EN CORTA CADUCIDAD')
-                        leyendas.append(patch_y)
-                    
+                        leyendas.append(mpatches.Patch(color='#ffe59a', label='SOLO CORTA CAD.'))
                     if hay_rojo:
-                        patch_r = mpatches.Patch(color='#fe9292', label='NO DISPONIBLE')
-                        leyendas.append(patch_r)
+                        leyendas.append(mpatches.Patch(color='#fe9292', label='NO DISPONIBLE'))
                         
                     if leyendas:
-                        # Ponemos la leyenda abajo, centrada
                         plt.legend(
                             handles=leyendas, 
-                            loc='lower center', 
-                            bbox_to_anchor=(0.5, -0.05), # Un poco más abajo de la tabla
-                            ncol=1 if len(leyendas) == 1 else 2, # Si son 2, ponerlas en fila
-                            frameon=False # Sin borde
+                            loc='upper center', # La anclamos arriba de su caja
+                            bbox_to_anchor=(0.5, -0.01), # Justo pegadito debajo de la tabla (coordenada Y negativa pequeña)
+                            ncol=2, 
+                            frameon=False,
+                            fontsize=9
                         )
 
                     # Guardar
                     buf = BytesIO()
-                    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
+                    # bbox_inches='tight' recorta todo el espacio blanco sobrante automáticamente
+                    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150, pad_inches=0.1)
                     buf.seek(0)
                     
-                    st.download_button(
-                        label="⬇️ Guardar PNG",
-                        data=buf,
-                        file_name="Lista_Revision.png",
-                        mime="image/png"
-                    )
+                    st.download_button("⬇️ Guardar PNG", data=buf, file_name="Lista_Revision.png", mime="image/png")
                 except Exception as e:
                     st.error(f"Error generando imagen: {e}")
 
         else:
             st.caption("Selecciona productos arriba para armar tu lista de revisión.")
-
 
 # ==============================================================================
 # VISTA 2: REPORTAR FALTANTES (POS)
