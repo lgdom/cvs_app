@@ -299,9 +299,9 @@ if vista == "🔍 Revisar Existencias":
                     altura_base = len(df_plot) * 0.35 + 1
                     
                     # Espacio extra si hay título (+1 pulgada)
-                    if cliente_foto: altura_base += 1
+                    if cliente_foto: altura_base += 0.2
                     # Espacio extra si hay leyenda (+1 pulgada)
-                    if hay_rojo or hay_amarillo: altura_base += 1
+                    if hay_rojo or hay_amarillo: altura_base += 0.2
                     
                     fig, ax = plt.subplots(figsize=(12, altura_base)) 
                     ax.axis('tight')
