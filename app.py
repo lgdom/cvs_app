@@ -115,45 +115,48 @@ if vista == "🔍 Revisar Existencias":
     if 'lista_revision' not in st.session_state: st.session_state.lista_revision = []
     if 'reset_counter' not in st.session_state: st.session_state.reset_counter = 0
 
-    # --- FUNCIÓN: DESCARGAR CARPETA ---
-    def obtener_archivo_de_carpeta(folder_id):
+    # --- FUNCIÓN: DESCARGAR CARPETA (Optimizado) ---
+    # Usamos cache para no intentar descargar de nuevo si acabamos de hacerlo hace poco
+    @st.cache_data(ttl=600, show_spinner=False) # ttl=600 segs (10 min) de memoria cache para la descarga
+    def descargar_de_drive(folder_id):
         try:
-            # Crear url de carpeta
             url = f'https://drive.google.com/drive/folders/{folder_id}'
-            
-            # Directorio temporal para descargar
             output_dir = './temp_drive_folder'
             
-            # Limpiar directorio previo si existe
             if os.path.exists(output_dir):
                 import shutil
                 shutil.rmtree(output_dir)
             os.makedirs(output_dir, exist_ok=True)
             
-            # Descargar contenido de la carpeta (Quiet=True para no llenar de logs)
-            # Nota: Solo descargará archivos pequeños rápidamente
+            # Descargamos
             gdown.download_folder(url, output=output_dir, quiet=True, use_cookies=False)
             
-            # Buscar el primer Excel o CSV que encontremos ahí
+            # Buscamos archivos
             archivos = glob.glob(f"{output_dir}/*.xlsx") + glob.glob(f"{output_dir}/*.csv")
             
             if archivos:
-                archivo_encontrado = archivos[0] # Tomamos el primero
+                ruta_archivo = archivos[0] # Tomamos el primero
+                nombre_archivo = os.path.basename(ruta_archivo)
                 
-                # Leerlo
-                if archivo_encontrado.endswith('.csv'):
-                    try: df = pd.read_csv(archivo_encontrado, header=1, encoding='latin-1')
-                    except: df = pd.read_csv(archivo_encontrado, header=1, encoding='utf-8')
+                # Intentamos obtener la fecha de modificación del archivo
+                # Nota: Esto depende de si Drive conserva el metadata al descargar
+                timestamp = os.path.getmtime(ruta_archivo)
+                fecha_mod = datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M')
+                
+                # Leer Dataframe
+                if ruta_archivo.endswith('.csv'):
+                    try: df = pd.read_csv(ruta_archivo, header=1, encoding='latin-1')
+                    except: df = pd.read_csv(ruta_archivo, header=1, encoding='utf-8')
                 else:
-                    df = pd.read_excel(archivo_encontrado, header=1)
+                    df = pd.read_excel(ruta_archivo, header=1)
                     
-                return df, os.path.basename(archivo_encontrado)
+                return df, nombre_archivo, fecha_mod
             else:
-                return None, None
+                return None, None, None
                 
         except Exception as e:
-            st.error(f"Error conectando a la carpeta: {e}")
-            return None, None
+            # Si falla, devolvemos el error como string para mostrarlo
+            return None, f"Error: {str(e)}", None
 
     # --- FUNCIÓN: PROCESAR DATA ---
     def procesar_inventario(df_raw):
@@ -174,12 +177,11 @@ if vista == "🔍 Revisar Existencias":
         cols_finales = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
         return df_merged[cols_finales]
 
-    # --- LÓGICA DE PRIORIDAD ---
-    # 1. Carga Manual
+    # --- LÓGICA DE CARGA ---
     uploaded_file = st.file_uploader("📤 Cargar archivo local (sobrescribe)", type=['csv', 'xlsx'])
     
     df_activo = None
-    origen_datos = ""
+    info_origen = ""
 
     # CASO A: Local
     if uploaded_file:
@@ -191,39 +193,57 @@ if vista == "🔍 Revisar Existencias":
                 df_raw = pd.read_excel(uploaded_file, header=1)
             
             df_activo = procesar_inventario(df_raw)
+            # Guardamos todo en sesión
             st.session_state.df_inventario_diario = df_activo
-            origen_datos = "Archivo Local"
+            st.session_state.info_archivo = f"Local: {uploaded_file.name}"
+            info_origen = st.session_state.info_archivo
             
         except Exception as e:
             st.error(f"Error archivo local: {e}")
 
-    # CASO B: Memoria
+    # CASO B: Memoria (Ya cargado)
     elif st.session_state.df_inventario_diario is not None:
         df_activo = st.session_state.df_inventario_diario
-        origen_datos = "Memoria (Sesión)"
+        # Recuperamos la info del archivo guardada
+        info_origen = st.session_state.get('info_archivo', 'Memoria')
 
-    # CASO C: Carpeta Drive
+    # CASO C: Carpeta Drive (Automático)
     elif DRIVE_FOLDER_ID:
-        with st.spinner("☁️ Buscando archivo en la carpeta de Drive..."):
-            df_cloud_raw, nombre_archivo = obtener_archivo_de_carpeta(DRIVE_FOLDER_ID)
+        with st.spinner("☁️ Sincronizando con Drive (esto toma unos segundos)..."):
+            # Llamamos a la función cacheada
+            df_cloud, nombre_archivo, fecha_mod = descargar_de_drive(DRIVE_FOLDER_ID)
             
-            if df_cloud_raw is not None:
-                df_activo = procesar_inventario(df_cloud_raw)
+            if df_cloud is not None:
+                df_activo = procesar_inventario(df_cloud)
+                
+                # Guardamos en sesión
                 st.session_state.df_inventario_diario = df_activo
-                origen_datos = f"Carpeta Drive ({nombre_archivo})"
+                
+                # Creamos el texto de información
+                info_str = f"☁️ Nube: {nombre_archivo} | 📅 Fecha: {fecha_mod}"
+                st.session_state.info_archivo = info_str
+                info_origen = info_str
+                
+                # Rerun para mostrar los datos inmediatamente
+                st.rerun()
             else:
-                st.warning("⚠️ La carpeta está vacía o no es pública.")
+                # Si nombre_archivo tiene texto, es que trajo un error
+                if nombre_archivo and "Error" in nombre_archivo:
+                    st.error(nombre_archivo)
+                else:
+                    st.warning("⚠️ Carpeta vacía o sin acceso.")
 
     # --- RENDERIZADO ---
     if df_activo is not None:
-        if "Drive" in origen_datos:
-            st.info(f"✅ Usando: {origen_datos}")
+        # Mostrar barra de info con versión
+        st.success(f"✅ {info_origen}")
         
         col_search, col_reset = st.columns([4, 1])
         with col_reset:
-            # Botón Recargar: Borra memoria para forzar a buscar en la carpeta de nuevo
-            if st.button("🔄 Recargar"):
+            # Botón Recargar: Limpia la memoria Y la cache de descarga
+            if st.button("🔄 Recargar Nube"):
                 st.session_state.df_inventario_diario = None
+                descargar_de_drive.clear() # Limpia la cache de la función de descarga
                 st.rerun()
         
         busqueda = st.text_input("¿Qué buscas?", placeholder="Nombre, Clave o Sustancia...").upper()
