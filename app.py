@@ -536,6 +536,8 @@ elif vista == "📝 Reportar Faltantes":
     
     with tab1:
         col1, col2 = st.columns([1, 2])
+        
+        # --- COLUMNA IZQUIERDA: BÚSQUEDA Y SELECCIÓN ---
         with col1:
             st.subheader("Datos")
             st.selectbox("Cliente:", options=df_clientes['DISPLAY'], index=None, placeholder="Buscar...", key="cliente_box")
@@ -544,10 +546,64 @@ elif vista == "📝 Reportar Faltantes":
             st.divider()
             st.subheader("Producto")
             
-            st.selectbox("Buscar:", options=df_productos['SEARCH_INDEX'], index=None, placeholder="Escribe para filtrar...", key="prod_box")
-            st.number_input("Cantidad:", min_value=1, value=1, key="qty_box")
-            st.button("➕ Agregar", on_click=agregar_producto, width="stretch")
+            # 1. Input de Búsqueda (Texto)
+            query_faltantes = st.text_input("Buscar:", placeholder="Nombre, Clave o Sustancia...", key="search_faltantes_input").upper()
+            
+            # Inicializar contador para resetear la tabla de búsqueda
+            if 'reset_search_faltantes' not in st.session_state:
+                st.session_state.reset_search_faltantes = 0
+            
+            if query_faltantes:
+                # 2. Filtrar Resultados
+                mask = df_productos['SEARCH_INDEX'].str.contains(query_faltantes, na=False)
+                resultados_f = df_productos[mask]
+                
+                # 3. Mostrar Tabla para Seleccionar
+                # Usamos una key dinámica para poder limpiar la selección al agregar
+                key_table = f"table_results_{st.session_state.reset_search_faltantes}"
+                
+                event_f = st.dataframe(
+                    resultados_f.drop(columns=['SEARCH_INDEX']), # Ocultamos el índice feo
+                    width="stretch",
+                    hide_index=True,
+                    on_select="rerun",
+                    selection_mode="single-row", # Solo uno a la vez para definir cantidad
+                    key=key_table,
+                    height=200 # Altura fija para que no empuje mucho
+                )
+                
+                # 4. Si hay selección, mostramos controles de agregar
+                if len(event_f.selection.rows) > 0:
+                    idx = event_f.selection.rows[0]
+                    row_selected = resultados_f.iloc[idx]
+                    
+                    st.success(f"Seleccionado: **{row_selected['DESCRIPCION']}**")
+                    
+                    c_qty, c_btn = st.columns([1, 1])
+                    cantidad = c_qty.number_input("Cantidad:", min_value=1, value=1, key="qty_faltantes_input")
+                    
+                    # Función Callback para agregar y limpiar
+                    def agregar_seleccion():
+                        if st.session_state.cliente_box:
+                            item = {
+                                "CODIGO": row_selected['CODIGO'],
+                                "DESCRIPCION": row_selected['DESCRIPCION'],
+                                "SOLICITADA": cantidad,
+                                "SURTIDO": 0,
+                                "O.C.": "N/A"
+                            }
+                            st.session_state.carrito.append(item)
+                            
+                            # Limpieza
+                            st.session_state.reset_search_faltantes += 1 # Resetea la tabla (quita selección)
+                            st.session_state.search_faltantes_input = "" # Borra el texto del buscador
+                            st.session_state.qty_faltantes_input = 1     # Resetea cantidad
+                        else:
+                            st.warning("⚠️ ¡Falta seleccionar el Cliente arriba!")
 
+                    c_btn.button("➕ Agregar", on_click=agregar_seleccion, use_container_width=True)
+
+        # --- COLUMNA DERECHA: CARRITO (Igual que antes) ---
         with col2:
             st.subheader("🛒 Carrito")
             if st.session_state.carrito:
@@ -558,9 +614,27 @@ elif vista == "📝 Reportar Faltantes":
                                    "O.C.": st.column_config.TextColumn("O.C.", width="small")})
                 
                 if not df_edited.equals(df_cart): st.session_state.carrito = df_edited.to_dict('records')
-                st.button("💾 TERMINAR PEDIDO", type="primary", width="stretch", on_click=finalizar_pedido, args=(fecha_input,))
+                
+                # Callback para guardar pedido completo
+                def finalizar_pedido_cb():
+                    if st.session_state.cliente_box:
+                        cod_cli, nom_cli = st.session_state.cliente_box.split(" - ", 1)
+                        pedido_nuevo = {
+                            "cli_cod": cod_cli,
+                            "cli_nom": nom_cli,
+                            "fecha": fecha_input,
+                            "items": pd.DataFrame(st.session_state.carrito)
+                        }
+                        st.session_state.pedidos.append(pedido_nuevo)
+                        st.session_state.carrito = []
+                        st.session_state.cliente_box = None
+                        st.session_state.search_faltantes_input = "" # Limpieza extra por si acaso
+                    else:
+                        st.error("Falta Cliente")
+
+                st.button("💾 TERMINAR PEDIDO", type="primary", use_container_width=True, on_click=finalizar_pedido_cb)
             else:
-                st.info("Carrito vacío.")
+                st.info("El carrito está vacío.")
 
     with tab2:
         st.metric("Pedidos Listos", len(st.session_state.pedidos))
