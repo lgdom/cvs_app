@@ -588,7 +588,7 @@ elif vista == "📝 Reportar Faltantes":
                 
                 # -------------------------------------
                 
-                # 3. Mostrar Tabla para Seleccionar
+               # 3. Mostrar Tabla para Seleccionar
                 key_table = f"table_results_{st.session_state.reset_search_faltantes}"
                 
                 event_f = st.dataframe(
@@ -597,8 +597,9 @@ elif vista == "📝 Reportar Faltantes":
                     hide_index=True,
                     on_select="rerun",
                     selection_mode="single-row", 
-                    key=key_table,
-                    height=200 
+                    key=key_table
+                    # HE BORRADO LA LÍNEA: height=200 
+                    # Al borrarla, la tabla se encoge automáticamente al tamaño del contenido.
                 )
                 
                 # 4. Si hay selección, mostramos controles de agregar
