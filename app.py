@@ -232,7 +232,7 @@ if vista == "🔍 Revisar Existencias":
         
         if busqueda:
             mask = df_activo['INDICE_BUSQUEDA'].str.contains(busqueda, na=False)
-            resultados = df_memoria[mask].drop(columns=['INDICE_BUSQUEDA'])
+            resultados = df_activo[mask].drop(columns=['INDICE_BUSQUEDA'])
             st.success(f"Encontrados: {len(resultados)}")
             
             dynamic_key = f"search_table_{st.session_state.reset_counter}"
