@@ -29,6 +29,11 @@ if 'df_inventario_diario' not in st.session_state: st.session_state.df_inventari
 # --- NUEVO: PERSISTENCIA DE DATOS (CLIENTE Y FECHA) ---
 if 'memoria_cliente' not in st.session_state: st.session_state.memoria_cliente = None
 if 'memoria_fecha' not in st.session_state: st.session_state.memoria_fecha = datetime.today()
+# --- NUEVO: MEMORIA PARA EL BUSCADOR DE INVENTARIO ---
+if 'memoria_busqueda_inv' not in st.session_state: st.session_state.memoria_busqueda_inv = ""
+# --- ESTADOS INICIALES ---
+if 'lista_revision' not in st.session_state: st.session_state.lista_revision = []
+if 'reset_counter' not in st.session_state: st.session_state.reset_counter = 0
 
 # --- FUNCIÓN DE CARGA DE DATOS (CATÁLOGOS MAESTROS) ---
 @st.cache_data
@@ -126,10 +131,6 @@ if vista == "🔍 Revisar Existencias":
     # --- CONFIGURACIÓN DE CARPETA DRIVE ---
     # Pega aquí el ID de tu CARPETA PÚBLICA (lo que sigue de folders/...)
     DRIVE_FOLDER_ID = "1bvF7yuIRiJQ0oiXiZ6s3JD8goy1DUi1K"  # <--- ¡PÉGALO AQUÍ!
-
-    # --- ESTADOS INICIALES ---
-    if 'lista_revision' not in st.session_state: st.session_state.lista_revision = []
-    if 'reset_counter' not in st.session_state: st.session_state.reset_counter = 0
 
     # --- FUNCIÓN: DESCARGAR CARPETA (Con Ajuste de Zona Horaria) ---
     @st.cache_data(ttl=600, show_spinner=False)
@@ -277,7 +278,21 @@ if vista == "🔍 Revisar Existencias":
                 descargar_de_drive.clear() # Limpia la cache de la función de descarga
                 st.rerun()
         
-        busqueda = st.text_input("¿Qué buscas?", placeholder="Nombre, Clave o Sustancia...").upper()
+        # --- BUSCADOR PERSISTENTE ---
+        def actualizar_busqueda_inv():
+            st.session_state.memoria_busqueda_inv = st.session_state.input_busqueda_inv
+
+        # El input muestra el valor guardado en memoria
+        texto_input = st.text_input(
+            "¿Qué buscas?", 
+            value=st.session_state.memoria_busqueda_inv, # Recupera lo escrito antes
+            placeholder="Nombre, Clave o Sustancia...",
+            key="input_busqueda_inv", 
+            on_change=actualizar_busqueda_inv # Guarda al escribir
+        )
+        
+        # Convertimos a mayúsculas para la lógica de filtrado
+        busqueda = texto_input.upper()
         
         resultados = pd.DataFrame()
         
@@ -509,7 +524,6 @@ elif vista == "📝 Reportar Faltantes":
             st.session_state.carrito = []
             st.session_state.cliente_box = None
             st.session_state.memoria_cliente = None # <--- NUEVO: Limpiar memoria
-            st.session_state.memoria_fecha = datetime.today()
             st.rerun()
     # ----------------------------------------------------
     
