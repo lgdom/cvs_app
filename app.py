@@ -115,14 +115,13 @@ if vista == "🔍 Revisar Existencias":
     if 'lista_revision' not in st.session_state: st.session_state.lista_revision = []
     if 'reset_counter' not in st.session_state: st.session_state.reset_counter = 0
 
-    # --- FUNCIÓN: DESCARGAR CARPETA (Corregida para tomar el más reciente) ---
+    # --- FUNCIÓN: DESCARGAR CARPETA (Lógica de Desempate) ---
     @st.cache_data(ttl=600, show_spinner=False)
     def descargar_de_drive(folder_id):
         try:
             url = f'https://drive.google.com/drive/folders/{folder_id}'
             output_dir = './temp_drive_folder'
             
-            # Limpieza previa
             if os.path.exists(output_dir):
                 import shutil
                 shutil.rmtree(output_dir)
@@ -131,23 +130,34 @@ if vista == "🔍 Revisar Existencias":
             # Descargamos todo
             gdown.download_folder(url, output=output_dir, quiet=True, use_cookies=False)
             
-            # Listamos todos los Excel y CSV
+            # Listamos archivos
             archivos = glob.glob(f"{output_dir}/*.xlsx") + glob.glob(f"{output_dir}/*.csv")
             
             if archivos:
-                # --- CORRECCIÓN CLAVE ---
-                # En lugar de tomar archivos[0], buscamos el que tenga la fecha de modificación más alta (el más nuevo)
-                archivo_mas_reciente = min(archivos, key=os.path.getmtime)
-                archivoViejo = min(archivos, key=os.path.getmtime)
-                print(archivo_mas_reciente)
-                print(archivoViejo)
-                # -----------------------
+                import re
                 
+                # Función auxiliar para calcular la "puntuación" de novedad de un archivo
+                def puntaje_novedad(ruta_archivo):
+                    # 1. Fecha de modificación (Prioridad Alta)
+                    mtime = os.path.getmtime(ruta_archivo)
+                    
+                    # 2. Versión en el nombre "Existencias (2).xlsx" (Prioridad Baja - Desempate)
+                    nombre = os.path.basename(ruta_archivo)
+                    match = re.search(r'\((\d+)\)\.', nombre)
+                    version = int(match.group(1)) if match else 0
+                    
+                    # Devolvemos una tupla: (Fecha, Version). Python ordenará primero por fecha, luego por versión.
+                    return (mtime, version)
+
+                # ELEGIMOS EL GANADOR: El que tenga mayor fecha y mayor versión
+                archivo_mas_reciente = max(archivos, key=puntaje_novedad)
+                
+                # Datos para devolver
                 nombre_archivo = os.path.basename(archivo_mas_reciente)
                 timestamp = os.path.getmtime(archivo_mas_reciente)
                 fecha_mod = datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M')
                 
-                # Leer Dataframe
+                # Leer
                 if archivo_mas_reciente.endswith('.csv'):
                     try: df = pd.read_csv(archivo_mas_reciente, header=1, encoding='latin-1')
                     except: df = pd.read_csv(archivo_mas_reciente, header=1, encoding='utf-8')
