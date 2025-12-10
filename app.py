@@ -231,7 +231,7 @@ if vista == "🔍 Revisar Existencias":
         resultados = pd.DataFrame()
         
         if busqueda:
-            mask = df_memoria['INDICE_BUSQUEDA'].str.contains(busqueda, na=False)
+            mask = df_activo['INDICE_BUSQUEDA'].str.contains(busqueda, na=False)
             resultados = df_memoria[mask].drop(columns=['INDICE_BUSQUEDA'])
             st.success(f"Encontrados: {len(resultados)}")
             
