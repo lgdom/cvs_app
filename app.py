@@ -177,7 +177,7 @@ if vista == "🔍 Revisar Existencias":
     # --- FUNCIÓN: PROCESAR DATA ---
     def procesar_inventario(df_raw):
         df_tj = df_raw.iloc[:, [0, 1, 5, 6]].copy()
-        df_tj.columns = ['CODIGO', 'PRODUCTO', 'CORTA_CAD', 'EXISTENCIA']
+        df_tj.columns = ['CODIGO', 'PRODUCTO_INV', 'CORTA_CAD', 'EXISTENCIA']
         df_tj = df_tj.dropna(subset=['CODIGO'])
         df_tj['CODIGO'] = df_tj['CODIGO'].astype(str).str.strip()
 
@@ -186,7 +186,7 @@ if vista == "🔍 Revisar Existencias":
         
         df_merged['INDICE_BUSQUEDA'] = (
             df_merged['CODIGO'] + " " + 
-            df_merged['PRODUCTO'] + " " + 
+            df_merged['PRODUCTO_INV'] + " " + 
             df_merged['SUSTANCIA']
         ).str.upper()
 
