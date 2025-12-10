@@ -6,6 +6,9 @@ from io import BytesIO
 from datetime import datetime
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import gdown
+import os
+import glob
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Sistema Ventas", page_icon="💊", layout="wide")
@@ -100,59 +103,129 @@ with st.sidebar:
 # ==============================================================================
 # VISTA 1: REVISAR EXISTENCIAS (INVENTARIO DIARIO)
 # ==============================================================================
+
 if vista == "🔍 Revisar Existencias":
     st.header("🔍 Buscador de Existencias")
 
+    # --- CONFIGURACIÓN DE CARPETA DRIVE ---
+    # Pega aquí el ID de tu CARPETA PÚBLICA (lo que sigue de folders/...)
+    DRIVE_FOLDER_ID = "1bvF7yuIRiJQ0oiXiZ6s3JD8goy1DUi1K"  # <--- ¡PÉGALO AQUÍ!
+
     # --- ESTADOS INICIALES ---
-    if 'lista_revision' not in st.session_state:
-        st.session_state.lista_revision = []
-    
-    if 'reset_counter' not in st.session_state:
-        st.session_state.reset_counter = 0
+    if 'lista_revision' not in st.session_state: st.session_state.lista_revision = []
+    if 'reset_counter' not in st.session_state: st.session_state.reset_counter = 0
 
-    # 1. CARGA DE ARCHIVO (Persistente)
-    if st.session_state.df_inventario_diario is None:
-        st.markdown("Sube el archivo del día para comenzar.")
-        uploaded_file = st.file_uploader("📤 Sube Inventario de Hoy (Excel/CSV)", type=['csv', 'xlsx'])
-        
-        if uploaded_file:
-            try:
-                with st.spinner("Procesando e indexando..."):
-                    if uploaded_file.name.endswith('.csv'):
-                        try: df_inv = pd.read_csv(uploaded_file, header=1, encoding='latin-1')
-                        except: uploaded_file.seek(0); df_inv = pd.read_csv(uploaded_file, header=1, encoding='utf-8')
-                    else:
-                        df_inv = pd.read_excel(uploaded_file, header=1)
-
-                    df_tj = df_inv.iloc[:, [0, 1, 5, 6]].copy()
-                    df_tj.columns = ['CODIGO', 'PRODUCTO_INV', 'CORTA_CAD', 'EXISTENCIA']
-                    df_tj = df_tj.dropna(subset=['CODIGO'])
-                    df_tj['CODIGO'] = df_tj['CODIGO'].astype(str).str.strip()
-
-                    df_merged = pd.merge(df_tj, df_productos[['CODIGO', 'SUSTANCIA']], on='CODIGO', how='left')
-                    df_merged['SUSTANCIA'] = df_merged['SUSTANCIA'].fillna('---')
-                    
-                    df_merged['INDICE_BUSQUEDA'] = (
-                        df_merged['CODIGO'] + " " + 
-                        df_merged['PRODUCTO_INV'] + " " + 
-                        df_merged['SUSTANCIA']
-                    ).str.upper()
-
-                    cols_finales = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
-                    st.session_state.df_inventario_diario = df_merged[cols_finales]
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Error procesando archivo diario: {e}")
+    # --- FUNCIÓN: DESCARGAR CARPETA ---
+    def obtener_archivo_de_carpeta(folder_id):
+        try:
+            # Crear url de carpeta
+            url = f'https://drive.google.com/drive/folders/{folder_id}'
+            
+            # Directorio temporal para descargar
+            output_dir = './temp_drive_folder'
+            
+            # Limpiar directorio previo si existe
+            if os.path.exists(output_dir):
+                import shutil
+                shutil.rmtree(output_dir)
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Descargar contenido de la carpeta (Quiet=True para no llenar de logs)
+            # Nota: Solo descargará archivos pequeños rápidamente
+            gdown.download_folder(url, output=output_dir, quiet=True, use_cookies=False)
+            
+            # Buscar el primer Excel o CSV que encontremos ahí
+            archivos = glob.glob(f"{output_dir}/*.xlsx") + glob.glob(f"{output_dir}/*.csv")
+            
+            if archivos:
+                archivo_encontrado = archivos[0] # Tomamos el primero
                 
-    else:
-        # --- INTERFAZ DE BÚSQUEDA ---
+                # Leerlo
+                if archivo_encontrado.endswith('.csv'):
+                    try: df = pd.read_csv(archivo_encontrado, header=1, encoding='latin-1')
+                    except: df = pd.read_csv(archivo_encontrado, header=1, encoding='utf-8')
+                else:
+                    df = pd.read_excel(archivo_encontrado, header=1)
+                    
+                return df, os.path.basename(archivo_encontrado)
+            else:
+                return None, None
+                
+        except Exception as e:
+            st.error(f"Error conectando a la carpeta: {e}")
+            return None, None
+
+    # --- FUNCIÓN: PROCESAR DATA ---
+    def procesar_inventario(df_raw):
+        df_tj = df_raw.iloc[:, [0, 1, 5, 6]].copy()
+        df_tj.columns = ['CODIGO', 'PRODUCTO_INV', 'CORTA_CAD', 'EXISTENCIA']
+        df_tj = df_tj.dropna(subset=['CODIGO'])
+        df_tj['CODIGO'] = df_tj['CODIGO'].astype(str).str.strip()
+
+        df_merged = pd.merge(df_tj, df_productos[['CODIGO', 'SUSTANCIA']], on='CODIGO', how='left')
+        df_merged['SUSTANCIA'] = df_merged['SUSTANCIA'].fillna('---')
+        
+        df_merged['INDICE_BUSQUEDA'] = (
+            df_merged['CODIGO'] + " " + 
+            df_merged['PRODUCTO_INV'] + " " + 
+            df_merged['SUSTANCIA']
+        ).str.upper()
+
+        cols_finales = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
+        return df_merged[cols_finales]
+
+    # --- LÓGICA DE PRIORIDAD ---
+    # 1. Carga Manual
+    uploaded_file = st.file_uploader("📤 Cargar archivo local (sobrescribe)", type=['csv', 'xlsx'])
+    
+    df_activo = None
+    origen_datos = ""
+
+    # CASO A: Local
+    if uploaded_file:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                try: df_raw = pd.read_csv(uploaded_file, header=1, encoding='latin-1')
+                except: uploaded_file.seek(0); df_raw = pd.read_csv(uploaded_file, header=1, encoding='utf-8')
+            else:
+                df_raw = pd.read_excel(uploaded_file, header=1)
+            
+            df_activo = procesar_inventario(df_raw)
+            st.session_state.df_inventario_diario = df_activo
+            origen_datos = "Archivo Local"
+            
+        except Exception as e:
+            st.error(f"Error archivo local: {e}")
+
+    # CASO B: Memoria
+    elif st.session_state.df_inventario_diario is not None:
+        df_activo = st.session_state.df_inventario_diario
+        origen_datos = "Memoria (Sesión)"
+
+    # CASO C: Carpeta Drive
+    elif DRIVE_FOLDER_ID:
+        with st.spinner("☁️ Buscando archivo en la carpeta de Drive..."):
+            df_cloud_raw, nombre_archivo = obtener_archivo_de_carpeta(DRIVE_FOLDER_ID)
+            
+            if df_cloud_raw is not None:
+                df_activo = procesar_inventario(df_cloud_raw)
+                st.session_state.df_inventario_diario = df_activo
+                origen_datos = f"Carpeta Drive ({nombre_archivo})"
+            else:
+                st.warning("⚠️ La carpeta está vacía o no es pública.")
+
+    # --- RENDERIZADO ---
+    if df_activo is not None:
+        if "Drive" in origen_datos:
+            st.info(f"✅ Usando: {origen_datos}")
+        
         col_search, col_reset = st.columns([4, 1])
         with col_reset:
-            if st.button("🔄 Cargar Otro Archivo"):
+            # Botón Recargar: Borra memoria para forzar a buscar en la carpeta de nuevo
+            if st.button("🔄 Recargar"):
                 st.session_state.df_inventario_diario = None
                 st.rerun()
         
-        df_memoria = st.session_state.df_inventario_diario
         busqueda = st.text_input("¿Qué buscas?", placeholder="Nombre, Clave o Sustancia...").upper()
         
         resultados = pd.DataFrame()
