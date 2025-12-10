@@ -9,6 +9,7 @@ import matplotlib.patches as mpatches
 import gdown
 import os
 import glob
+import pytz
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Sistema Ventas", page_icon="💊", layout="wide")
@@ -115,10 +116,12 @@ if vista == "🔍 Revisar Existencias":
     if 'lista_revision' not in st.session_state: st.session_state.lista_revision = []
     if 'reset_counter' not in st.session_state: st.session_state.reset_counter = 0
 
-    # --- FUNCIÓN: DESCARGAR CARPETA (Lógica de Desempate) ---
+    # --- FUNCIÓN: DESCARGAR CARPETA (Con Ajuste de Zona Horaria) ---
     @st.cache_data(ttl=600, show_spinner=False)
     def descargar_de_drive(folder_id):
         try:
+            import pytz # Librería para zonas horarias
+            
             url = f'https://drive.google.com/drive/folders/{folder_id}'
             output_dir = './temp_drive_folder'
             
@@ -127,37 +130,37 @@ if vista == "🔍 Revisar Existencias":
                 shutil.rmtree(output_dir)
             os.makedirs(output_dir, exist_ok=True)
             
-            # Descargamos todo
             gdown.download_folder(url, output=output_dir, quiet=True, use_cookies=False)
             
-            # Listamos archivos
             archivos = glob.glob(f"{output_dir}/*.xlsx") + glob.glob(f"{output_dir}/*.csv")
             
             if archivos:
                 import re
                 
-                # Función auxiliar para calcular la "puntuación" de novedad de un archivo
                 def puntaje_novedad(ruta_archivo):
-                    # 1. Fecha de modificación (Prioridad Alta)
                     mtime = os.path.getmtime(ruta_archivo)
-                    
-                    # 2. Versión en el nombre "Existencias (2).xlsx" (Prioridad Baja - Desempate)
                     nombre = os.path.basename(ruta_archivo)
                     match = re.search(r'\((\d+)\)\.', nombre)
                     version = int(match.group(1)) if match else 0
-                    
-                    # Devolvemos una tupla: (Fecha, Version). Python ordenará primero por fecha, luego por versión.
                     return (mtime, version)
 
-                # ELEGIMOS EL GANADOR: El que tenga mayor fecha y mayor versión
                 archivo_mas_reciente = max(archivos, key=puntaje_novedad)
                 
-                # Datos para devolver
-                nombre_archivo = os.path.basename(archivo_mas_reciente)
+                # --- CORRECCIÓN DE HORA AQUÍ ---
                 timestamp = os.path.getmtime(archivo_mas_reciente)
-                fecha_mod = datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M')
                 
-                # Leer
+                # 1. Interpretamos la fecha como UTC (Hora del servidor)
+                dt_utc = datetime.fromtimestamp(timestamp, pytz.utc)
+                
+                # 2. Convertimos a hora de TIJUANA
+                zona_tijuana = pytz.timezone('America/Tijuana')
+                dt_local = dt_utc.astimezone(zona_tijuana)
+                
+                fecha_mod = dt_local.strftime('%d/%m/%Y %H:%M')
+                # -------------------------------
+                
+                nombre_archivo = os.path.basename(archivo_mas_reciente)
+                
                 if archivo_mas_reciente.endswith('.csv'):
                     try: df = pd.read_csv(archivo_mas_reciente, header=1, encoding='latin-1')
                     except: df = pd.read_csv(archivo_mas_reciente, header=1, encoding='utf-8')
