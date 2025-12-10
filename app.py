@@ -554,24 +554,33 @@ elif vista == "📝 Reportar Faltantes":
                 st.session_state.reset_search_faltantes = 0
             
             if query_faltantes:
-                # 2. Filtrar Resultados
+                # 2. Filtrar Resultados (Busca en el índice sucio pero completo)
                 mask = df_productos['SEARCH_INDEX'].str.contains(query_faltantes, na=False)
                 resultados_f = df_productos[mask].copy()
                 
-                # --- LIMPIEZA DE RESULTADOS (NUEVO) ---
-                # 1. Eliminar filas donde la Descripción esté vacía o sea nula
-                resultados_f = resultados_f.dropna(subset=['DESCRIPCION'])
-                resultados_f = resultados_f[resultados_f['DESCRIPCION'].astype(str).str.strip() != ""]
+                # --- LÓGICA DE LIMPIEZA "VISTA 1" ---
                 
-                # 2. Eliminar Duplicados (Si un código se repite, nos quedamos con el primero)
-                resultados_f = resultados_f.drop_duplicates(subset=['CODIGO'])
-                # --------------------------------------
+                # A. Eliminar vacíos en Descripción
+                resultados_f = resultados_f.dropna(subset=['DESCRIPCION'])
+                
+                # B. ELIMINAR DUPLICADOS POR CÓDIGO (La clave para que se vea limpio)
+                # Esto fuerza a que solo exista 1 fila por cada código único.
+                resultados_f = resultados_f.drop_duplicates(subset=['CODIGO'], keep='first')
+                
+                # C. Seleccionar solo las columnas bonitas (Ocultamos el índice de búsqueda)
+                # Aseguramos el orden: CÓDIGO | DESCRIPCION | SUSTANCIA
+                cols_mostrar = ['CODIGO', 'DESCRIPCION', 'SUSTANCIA']
+                # Filtramos solo las columnas que realmente existen para evitar errores
+                cols_existentes = [c for c in cols_mostrar if c in resultados_f.columns]
+                resultados_f = resultados_f[cols_existentes]
+                
+                # -------------------------------------
                 
                 # 3. Mostrar Tabla para Seleccionar
                 key_table = f"table_results_{st.session_state.reset_search_faltantes}"
                 
                 event_f = st.dataframe(
-                    resultados_f.drop(columns=['SEARCH_INDEX']), 
+                    resultados_f, 
                     width="stretch",
                     hide_index=True,
                     on_select="rerun",
