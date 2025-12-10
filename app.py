@@ -509,6 +509,7 @@ elif vista == "📝 Reportar Faltantes":
             st.session_state.carrito = []
             st.session_state.cliente_box = None
             st.session_state.memoria_cliente = None # <--- NUEVO: Limpiar memoria
+            st.session_state.memoria_fecha = datetime.today()
             st.rerun()
     # ----------------------------------------------------
     
