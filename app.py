@@ -137,7 +137,7 @@ if vista == "🔍 Revisar Existencias":
             if archivos:
                 # --- CORRECCIÓN CLAVE ---
                 # En lugar de tomar archivos[0], buscamos el que tenga la fecha de modificación más alta (el más nuevo)
-                archivo_mas_reciente = max(archivos, key=os.path.getmtime)
+                archivo_mas_reciente = min(archivos, key=os.path.getmtime)
                 archivoViejo = min(archivos, key=os.path.getmtime)
                 print(archivo_mas_reciente)
                 print(archivoViejo)
