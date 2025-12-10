@@ -556,20 +556,28 @@ elif vista == "📝 Reportar Faltantes":
             if query_faltantes:
                 # 2. Filtrar Resultados
                 mask = df_productos['SEARCH_INDEX'].str.contains(query_faltantes, na=False)
-                resultados_f = df_productos[mask]
+                resultados_f = df_productos[mask].copy()
+                
+                # --- LIMPIEZA DE RESULTADOS (NUEVO) ---
+                # 1. Eliminar filas donde la Descripción esté vacía o sea nula
+                resultados_f = resultados_f.dropna(subset=['DESCRIPCION'])
+                resultados_f = resultados_f[resultados_f['DESCRIPCION'].astype(str).str.strip() != ""]
+                
+                # 2. Eliminar Duplicados (Si un código se repite, nos quedamos con el primero)
+                resultados_f = resultados_f.drop_duplicates(subset=['CODIGO'])
+                # --------------------------------------
                 
                 # 3. Mostrar Tabla para Seleccionar
-                # Usamos una key dinámica para poder limpiar la selección al agregar
                 key_table = f"table_results_{st.session_state.reset_search_faltantes}"
                 
                 event_f = st.dataframe(
-                    resultados_f.drop(columns=['SEARCH_INDEX']), # Ocultamos el índice feo
+                    resultados_f.drop(columns=['SEARCH_INDEX']), 
                     width="stretch",
                     hide_index=True,
                     on_select="rerun",
-                    selection_mode="single-row", # Solo uno a la vez para definir cantidad
+                    selection_mode="single-row", 
                     key=key_table,
-                    height=200 # Altura fija para que no empuje mucho
+                    height=200 
                 )
                 
                 # 4. Si hay selección, mostramos controles de agregar
@@ -582,7 +590,6 @@ elif vista == "📝 Reportar Faltantes":
                     c_qty, c_btn = st.columns([1, 1])
                     cantidad = c_qty.number_input("Cantidad:", min_value=1, value=1, key="qty_faltantes_input")
                     
-                    # Función Callback para agregar y limpiar
                     def agregar_seleccion():
                         if st.session_state.cliente_box:
                             item = {
@@ -594,10 +601,9 @@ elif vista == "📝 Reportar Faltantes":
                             }
                             st.session_state.carrito.append(item)
                             
-                            # Limpieza
-                            st.session_state.reset_search_faltantes += 1 # Resetea la tabla (quita selección)
-                            st.session_state.search_faltantes_input = "" # Borra el texto del buscador
-                            st.session_state.qty_faltantes_input = 1     # Resetea cantidad
+                            st.session_state.reset_search_faltantes += 1 
+                            st.session_state.search_faltantes_input = "" 
+                            st.session_state.qty_faltantes_input = 1     
                         else:
                             st.warning("⚠️ ¡Falta seleccionar el Cliente arriba!")
 
