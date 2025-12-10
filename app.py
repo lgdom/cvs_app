@@ -275,7 +275,7 @@ if vista == "🔍 Revisar Existencias":
             
             event = st.dataframe(
                 resultados,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 on_select="rerun", 
                 selection_mode="multi-row",
@@ -338,7 +338,7 @@ if vista == "🔍 Revisar Existencias":
 
             st.dataframe(
                 df_rev.style.apply(estilo_existencias, axis=1),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True
             )
             
@@ -529,19 +529,19 @@ elif vista == "📝 Reportar Faltantes":
             
             st.selectbox("Buscar:", options=df_productos['SEARCH_INDEX'], index=None, placeholder="Escribe para filtrar...", key="prod_box")
             st.number_input("Cantidad:", min_value=1, value=1, key="qty_box")
-            st.button("➕ Agregar", on_click=agregar_producto, use_container_width=True)
+            st.button("➕ Agregar", on_click=agregar_producto, width="stretch")
 
         with col2:
             st.subheader("🛒 Carrito")
             if st.session_state.carrito:
                 df_cart = pd.DataFrame(st.session_state.carrito)
-                df_edited = st.data_editor(df_cart, use_container_width=True, num_rows="dynamic", key="editor_data",
+                df_edited = st.data_editor(df_cart, width="stretch", num_rows="dynamic", key="editor_data",
                     column_config={"SOLICITADA": st.column_config.NumberColumn("Solicitada", width="small"),
                                    "SURTIDO": st.column_config.NumberColumn("Surtido", width="small"),
                                    "O.C.": st.column_config.TextColumn("O.C.", width="small")})
                 
                 if not df_edited.equals(df_cart): st.session_state.carrito = df_edited.to_dict('records')
-                st.button("💾 TERMINAR PEDIDO", type="primary", use_container_width=True, on_click=finalizar_pedido, args=(fecha_input,))
+                st.button("💾 TERMINAR PEDIDO", type="primary", width="stretch", on_click=finalizar_pedido, args=(fecha_input,))
             else:
                 st.info("Carrito vacío.")
 
