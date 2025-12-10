@@ -395,7 +395,7 @@ if vista == "🔍 Revisar Existencias":
                         if ex == 0 and cc == 0:
                             fila_color = ['#fe9292'] * len(df_plot.columns)
                             hay_rojo = True
-                        elif cc > 0:
+                        elif ex == 0 and cc > 0:
                             fila_color = ['#ffe59a'] * len(df_plot.columns)
                             hay_amarillo = True
                         else:
