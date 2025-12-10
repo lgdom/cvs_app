@@ -190,7 +190,7 @@ if vista == "🔍 Revisar Existencias":
             df_merged['SUSTANCIA']
         ).str.upper()
 
-        cols_finales = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
+        cols_finales = ['CODIGO', 'PRODUCTO', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
         return df_merged[cols_finales]
 
     # --- LÓGICA DE CARGA ---
