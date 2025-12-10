@@ -26,6 +26,9 @@ if 'pedidos' not in st.session_state: st.session_state.pedidos = []
 if 'carrito' not in st.session_state: st.session_state.carrito = []
 # Inventario (Nueva variable para persistencia)
 if 'df_inventario_diario' not in st.session_state: st.session_state.df_inventario_diario = None
+# --- NUEVO: PERSISTENCIA DE DATOS (CLIENTE Y FECHA) ---
+if 'memoria_cliente' not in st.session_state: st.session_state.memoria_cliente = None
+if 'memoria_fecha' not in st.session_state: st.session_state.memoria_fecha = datetime.today()
 
 # --- FUNCIÓN DE CARGA DE DATOS (CATÁLOGOS MAESTROS) ---
 @st.cache_data
