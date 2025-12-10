@@ -121,7 +121,7 @@ def render_view(df_productos, df_clientes):
                 existencia = pd.to_numeric(row['EXISTENCIA'], errors='coerce') or 0
                 corta_cad = pd.to_numeric(row['CORTA_CAD'], errors='coerce') or 0
                 colores = [''] * len(row)
-                if existencia == 0 and corta_cad == 0: colores = ['background-color: #fe9292'] * len(row)
+                if existencia == 0 and corta_cad == 0: colores = ['background-color: #390D10'] * len(row)
                 elif existencia == 0 and corta_cad > 0: colores = ['background-color: #4B3718'] * len(row)
                 return colores
 
