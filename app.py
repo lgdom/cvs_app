@@ -190,7 +190,7 @@ if vista == "🔍 Revisar Existencias":
             df_merged['SUSTANCIA']
         ).str.upper()
 
-        cols_finales = ['CODIGO', 'PRODUCTO', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
+        cols_finales = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'INDICE_BUSQUEDA']
         return df_merged[cols_finales]
 
     # --- LÓGICA DE CARGA ---
@@ -317,7 +317,7 @@ if vista == "🔍 Revisar Existencias":
             df_rev = pd.DataFrame(st.session_state.lista_revision)
             
             # Orden de columnas
-            cols_orden = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'SOLICITADO']
+            cols_orden = ['CODIGO', 'PRODUCTO', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'SOLICITADO']
             for c in cols_orden:
                 if c not in df_rev.columns: df_rev[c] = "-"
             df_rev = df_rev[cols_orden]
