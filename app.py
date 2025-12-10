@@ -70,9 +70,21 @@ def cargar_catalogos():
         if 'SUSTANCIA' not in df_prod.columns: df_prod['SUSTANCIA'] = '---'
         else: df_prod['SUSTANCIA'] = df_prod['SUSTANCIA'].fillna('---')
 
-        # Índice de búsqueda optimizado (Pre-cálculo)
+        # --- LIMPIEZA AGRESIVA (NUEVO) ---
+        # 1. Asegurar que el código sea texto limpio (sin espacios invisibles)
+        df_prod['CODIGO'] = df_prod['CODIGO'].astype(str).str.strip()
+        
+        # 2. Eliminar códigos duplicados (Se queda con la primera aparición)
+        # Esto soluciona que te salgan "varias filas" si el código se repite en el archivo
+        df_prod = df_prod.drop_duplicates(subset=['CODIGO'], keep='first')
+        
+        # 3. Eliminar productos sin nombre
+        df_prod = df_prod.dropna(subset=['DESCRIPCION'])
+        # ---------------------------------
+
+        # Índice de búsqueda optimizado
         df_prod['SEARCH_INDEX'] = (
-            df_prod['CODIGO'].astype(str) + " | " + 
+            df_prod['CODIGO'] + " | " + 
             df_prod['DESCRIPCION'].astype(str) + " | " + 
             df_prod['SUSTANCIA'].astype(str)
         ).str.upper()
