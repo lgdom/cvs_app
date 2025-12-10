@@ -504,11 +504,12 @@ elif vista == "📝 Reportar Faltantes":
         st.divider()
         st.markdown("### ⚙️ Acciones")
         # Usamos type="primary" para que salga rojo/destacado
-        if st.button("🗑️ BORRAR TODO (Reiniciar)", type="primary", help="Borra todos los pedidos y el carrito actual"):
+        if st.button("🗑️ BORRAR TODO (Reiniciar)", type="primary"):
             st.session_state.pedidos = []
             st.session_state.carrito = []
             st.session_state.cliente_box = None
-            st.rerun() # Recarga la página suavemente con los datos en cero
+            st.session_state.memoria_cliente = None # <--- NUEVO: Limpiar memoria
+            st.rerun()
     # ----------------------------------------------------
     
     # Callbacks
@@ -532,18 +533,15 @@ elif vista == "📝 Reportar Faltantes":
         else:
             st.warning("⚠️ Selecciona Cliente y Producto")
 
-    def finalizar_pedido(fecha):
+    def finalizar_pedido_cb():
         if st.session_state.cliente_box:
-            cod_cli, nom_cli = st.session_state.cliente_box.split(" - ", 1)
-            pedido_nuevo = {
-                "cli_cod": cod_cli,
-                "cli_nom": nom_cli,
-                "fecha": fecha,
-                "items": pd.DataFrame(st.session_state.carrito)
-            }
+            # ... (código de guardado del pedido) ...
+                        
             st.session_state.pedidos.append(pedido_nuevo)
             st.session_state.carrito = []
             st.session_state.cliente_box = None
+            st.session_state.memoria_cliente = None # <--- NUEVO: Limpiar memoria
+            st.session_state.search_faltantes_input = "" 
         else:
             st.error("Falta Cliente")
 
@@ -555,8 +553,38 @@ elif vista == "📝 Reportar Faltantes":
         # --- COLUMNA IZQUIERDA: BÚSQUEDA Y SELECCIÓN ---
         with col1:
             st.subheader("Datos")
-            st.selectbox("Cliente:", options=df_clientes['DISPLAY'], index=None, placeholder="Buscar...", key="cliente_box")
-            fecha_input = st.date_input("Fecha:", datetime.today())
+            
+            # --- LÓGICA DE PERSISTENCIA PARA CLIENTE ---
+            # 1. Calculamos el índice donde está el cliente guardado
+            lista_opciones = df_clientes['DISPLAY'].tolist()
+            try:
+                idx_guardado = lista_opciones.index(st.session_state.memoria_cliente)
+            except:
+                idx_guardado = None
+
+            # 2. Función para actualizar la memoria cuando cambies el cliente
+            def actualizar_cliente():
+                st.session_state.memoria_cliente = st.session_state.cliente_box
+
+            st.selectbox(
+                "Cliente:", 
+                options=df_clientes['DISPLAY'], 
+                index=idx_guardado, # Usamos el índice recuperado
+                placeholder="Buscar...", 
+                key="cliente_box", 
+                on_change=actualizar_cliente # Guardamos cambios al momento
+            )
+            
+            # --- LÓGICA DE PERSISTENCIA PARA FECHA ---
+            def actualizar_fecha():
+                st.session_state.memoria_fecha = st.session_state.fecha_box
+
+            fecha_input = st.date_input(
+                "Fecha:", 
+                value=st.session_state.memoria_fecha, # Usamos valor recuperado
+                key="fecha_box", # Cambié el key para diferenciarlo
+                on_change=actualizar_fecha
+            )
             
             st.divider()
             st.subheader("Producto")
