@@ -310,25 +310,22 @@ if vista == "🔍 Revisar Existencias":
         st.divider()
         st.subheader("📋 Tu Lista de Revisión")
         
-        col_info, col_borrar = st.columns([4, 1])
+        # Columnas para los botones de acción
+        col_info, col_borrar_sel, col_borrar_todo = st.columns([3, 2, 1])
         
         if st.session_state.lista_revision:
             df_rev = pd.DataFrame(st.session_state.lista_revision)
             
-            # 1. CORRECCIÓN: Agregamos SUSTANCIA a la lista base para que exista
+            # Orden de columnas
             cols_orden = ['CODIGO', 'PRODUCTO_INV', 'SUSTANCIA', 'EXISTENCIA', 'CORTA_CAD', 'SOLICITADO']
-            
-            # Asegurar que existan las columnas
             for c in cols_orden:
                 if c not in df_rev.columns: df_rev[c] = "-"
-            
             df_rev = df_rev[cols_orden]
 
-            # Estilos visuales en pantalla
+            # Estilos
             def estilo_existencias(row):
                 existencia = pd.to_numeric(row['EXISTENCIA'], errors='coerce') or 0
                 corta_cad = pd.to_numeric(row['CORTA_CAD'], errors='coerce') or 0
-                
                 colores = [''] * len(row)
                 if existencia == 0 and corta_cad == 0:
                     colores = ['background-color: #390D10'] * len(row)
@@ -336,14 +333,34 @@ if vista == "🔍 Revisar Existencias":
                     colores = ['background-color: #4B3718'] * len(row)
                 return colores
 
-            st.dataframe(
+            # --- TABLA INTERACTIVA (CON SELECCIÓN) ---
+            # Guardamos el evento para saber qué filas seleccionaste
+            event_revision = st.dataframe(
                 df_rev.style.apply(estilo_existencias, axis=1),
                 width="stretch",
-                hide_index=True
+                hide_index=True,
+                on_select="rerun",          # <--- Activamos selección
+                selection_mode="multi-row", # <--- Selección múltiple
+                key="tabla_revision_final"
             )
             
-            with col_borrar:
-                if st.button("🗑️ Limpiar Lista"):
+            # --- LÓGICA DE BORRADO SELECTIVO ---
+            filas_seleccionadas = event_revision.selection.rows
+            
+            with col_borrar_sel:
+                # El botón solo aparece si seleccionaste algo
+                if filas_seleccionadas:
+                    if st.button(f"🗑️ Borrar ({len(filas_seleccionadas)}) seleccionados"):
+                        # Reconstruimos la lista EXCLUYENDO los índices seleccionados
+                        indices_a_borrar = set(filas_seleccionadas)
+                        st.session_state.lista_revision = [
+                            item for i, item in enumerate(st.session_state.lista_revision) 
+                            if i not in indices_a_borrar
+                        ]
+                        st.rerun()
+
+            with col_borrar_todo:
+                if st.button("🔥 Borrar Todo"):
                     st.session_state.lista_revision = []
                     st.rerun()
 
