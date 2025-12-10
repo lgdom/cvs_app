@@ -329,7 +329,7 @@ if vista == "🔍 Revisar Existencias":
                 colores = [''] * len(row)
                 if existencia == 0 and corta_cad == 0:
                     colores = ['background-color: #390D10'] * len(row)
-                elif corta_cad > 0:
+                elif existencia == 0 and corta_cad > 0:
                     colores = ['background-color: #4B3718'] * len(row)
                 return colores
 
