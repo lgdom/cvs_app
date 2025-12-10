@@ -115,47 +115,47 @@ if vista == "🔍 Revisar Existencias":
     if 'lista_revision' not in st.session_state: st.session_state.lista_revision = []
     if 'reset_counter' not in st.session_state: st.session_state.reset_counter = 0
 
-    # --- FUNCIÓN: DESCARGAR CARPETA (Optimizado) ---
-    # Usamos cache para no intentar descargar de nuevo si acabamos de hacerlo hace poco
-    @st.cache_data(ttl=600, show_spinner=False) # ttl=600 segs (10 min) de memoria cache para la descarga
+    # --- FUNCIÓN: DESCARGAR CARPETA (Corregida para tomar el más reciente) ---
+    @st.cache_data(ttl=600, show_spinner=False)
     def descargar_de_drive(folder_id):
         try:
             url = f'https://drive.google.com/drive/folders/{folder_id}'
             output_dir = './temp_drive_folder'
             
+            # Limpieza previa
             if os.path.exists(output_dir):
                 import shutil
                 shutil.rmtree(output_dir)
             os.makedirs(output_dir, exist_ok=True)
             
-            # Descargamos
+            # Descargamos todo
             gdown.download_folder(url, output=output_dir, quiet=True, use_cookies=False)
             
-            # Buscamos archivos
+            # Listamos todos los Excel y CSV
             archivos = glob.glob(f"{output_dir}/*.xlsx") + glob.glob(f"{output_dir}/*.csv")
             
             if archivos:
-                ruta_archivo = archivos[0] # Tomamos el primero
-                nombre_archivo = os.path.basename(ruta_archivo)
+                # --- CORRECCIÓN CLAVE ---
+                # En lugar de tomar archivos[0], buscamos el que tenga la fecha de modificación más alta (el más nuevo)
+                archivo_mas_reciente = max(archivos, key=os.path.getmtime)
+                # -----------------------
                 
-                # Intentamos obtener la fecha de modificación del archivo
-                # Nota: Esto depende de si Drive conserva el metadata al descargar
-                timestamp = os.path.getmtime(ruta_archivo)
+                nombre_archivo = os.path.basename(archivo_mas_reciente)
+                timestamp = os.path.getmtime(archivo_mas_reciente)
                 fecha_mod = datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M')
                 
                 # Leer Dataframe
-                if ruta_archivo.endswith('.csv'):
-                    try: df = pd.read_csv(ruta_archivo, header=1, encoding='latin-1')
-                    except: df = pd.read_csv(ruta_archivo, header=1, encoding='utf-8')
+                if archivo_mas_reciente.endswith('.csv'):
+                    try: df = pd.read_csv(archivo_mas_reciente, header=1, encoding='latin-1')
+                    except: df = pd.read_csv(archivo_mas_reciente, header=1, encoding='utf-8')
                 else:
-                    df = pd.read_excel(ruta_archivo, header=1)
+                    df = pd.read_excel(archivo_mas_reciente, header=1)
                     
                 return df, nombre_archivo, fecha_mod
             else:
                 return None, None, None
                 
         except Exception as e:
-            # Si falla, devolvemos el error como string para mostrarlo
             return None, f"Error: {str(e)}", None
 
     # --- FUNCIÓN: PROCESAR DATA ---
