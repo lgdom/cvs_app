@@ -1,0 +1,206 @@
+{
+    "[EMISION]": {
+        "x": 40.57,
+        "y": 565.3,
+        "size": 7.15,
+        "font": "Poppins-Light",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[EMISION]"
+    },
+    "[FOLIO]": {
+        "x": 234.39,
+        "y": 565.3,
+        "size": 7.15,
+        "font": "Poppins-Light",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[FOLIO]"
+    },
+    "[VIGENCIA]": {
+        "x": 308.09,
+        "y": 565.3,
+        "size": 7.15,
+        "font": "Poppins-Light",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[VIGENCIA]"
+    },
+    "[CARGO]": {
+        "x": 409.28,
+        "y": 565.3,
+        "size": 7.15,
+        "font": "Poppins-Light",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[CARGO]"
+    },
+    "[ABONO]": {
+        "x": 478.46,
+        "y": 565.3,
+        "size": 7.15,
+        "font": "Poppins-Light",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[ABONO]"
+    },
+    "[SALDO]": {
+        "x": 547.25,
+        "y": 565.3,
+        "size": 7.15,
+        "font": "Poppins-Light",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[SALDO]"
+    },
+    "$[SA]": {
+        "x": 557.21,
+        "y": 37.09,
+        "size": 12.6,
+        "font": "Poppins-Medium",
+        "color": [
+            0.71,
+            0.059,
+            0.098
+        ],
+        "original": "$[SA]"
+    },
+    "[NP]": {
+        "x": 542.17,
+        "y": 13.73,
+        "size": 8.75,
+        "font": "Poppins-Regular",
+        "color": [
+            0.71,
+            0.059,
+            0.098
+        ],
+        "original": "[NP]"
+    },
+    "[PT]": {
+        "x": 576.8,
+        "y": 13.73,
+        "size": 8.75,
+        "font": "Poppins-Regular",
+        "color": [
+            0.71,
+            0.059,
+            0.098
+        ],
+        "original": "[PT]"
+    },
+    "[FECHA]": {
+        "x": 550.15,
+        "y": 720.29,
+        "size": 9.0,
+        "font": "Poppins-SemiBold",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[FECHA]"
+    },
+    "[SI]": {
+        "x": 575.23,
+        "y": 688.31,
+        "size": 8.2,
+        "font": "Poppins-Regular",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[SI]"
+    },
+    "[CF]": {
+        "x": 571.6,
+        "y": 676.06,
+        "size": 8.2,
+        "font": "Poppins-Regular",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[CF]"
+    },
+    "[IP]": {
+        "x": 575.3,
+        "y": 663.76,
+        "size": 8.2,
+        "font": "Poppins-Regular",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[IP]"
+    },
+    "$[IMPORTE]": {
+        "x": 543.06,
+        "y": 642.67,
+        "size": 8.2,
+        "font": "Poppins-Regular",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "$[IMPORTE]"
+    },
+    "[CLAVE]": {
+        "x": 60.36,
+        "y": 661.04,
+        "size": 8.2,
+        "font": "Poppins-SemiBold",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[CLAVE]"
+    },
+    "[NOMBRE]": {
+        "x": 23.0,
+        "y": 648.24,
+        "size": 8.2,
+        "font": "Poppins-Light",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[NOMBRE]"
+    },
+    "[DIRECCION]": {
+        "x": 23.0,
+        "y": 635.28,
+        "size": 8.2,
+        "font": "Poppins-Light",
+        "color": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "original": "[DIRECCION]"
+    }
+}

@@ -1,0 +1,21 @@
+# Entorno virtual
+venv/
+.venv/
+venv_linux/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Secretos (IMPORTANTE)
+service_account.json
+.streamlit/secrets.toml
+
+# Archivos de sistema / Temp
+.DS_Store
+temp_drive_folder/
+data/session_cache.json
+
+# Local config (si aplica)
+.env
